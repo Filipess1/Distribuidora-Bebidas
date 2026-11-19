@@ -1,5 +1,7 @@
+import hmac
 import json
 import os
+import time
 import streamlit as st
 import streamlit.components.v1 as components
 from sqlalchemy import create_engine, text
@@ -10,6 +12,50 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+
+def _verificar_pin_acesso(titulo_app: str, icone: str):
+    """Bloqueia o acesso no servidor Streamlit antes de carregar dados ou chaves do Supabase."""
+    pin_esperado = str(st.secrets.get("APP_PIN", os.environ.get("APP_PIN", ""))).strip()
+    if not pin_esperado:
+        return True
+
+    if st.session_state.get("pin_autenticado"):
+        return True
+
+    bloqueado_ate = st.session_state.get("pin_bloqueado_ate", 0)
+    if time.time() < bloqueado_ate:
+        restante = int(bloqueado_ate - time.time())
+        st.error(f"Muitas tentativas incorretas. Aguarde {restante}s para tentar novamente.")
+        st.stop()
+
+    _, col_centro, _ = st.columns([1, 1.3, 1])
+    with col_centro:
+        st.markdown("<div style='height: 12vh'></div>", unsafe_allow_html=True)
+        with st.form("form_pin_acesso"):
+            st.markdown(f"### {icone} {titulo_app}")
+            st.caption("Acesso protegido por PIN de segurança")
+            pin_digitado = st.text_input("Digite o PIN de acesso:", type="password")
+            entrar = st.form_submit_button("Desbloquear Sistema", type="primary", use_container_width=True)
+
+            if entrar:
+                if pin_digitado and hmac.compare_digest(pin_digitado.strip(), pin_esperado):
+                    st.session_state["pin_autenticado"] = True
+                    st.session_state["pin_tentativas"] = 0
+                    st.rerun()
+                else:
+                    tentativas = st.session_state.get("pin_tentativas", 0) + 1
+                    st.session_state["pin_tentativas"] = tentativas
+                    if tentativas >= 5:
+                        st.session_state["pin_bloqueado_ate"] = time.time() + 120
+                        st.session_state["pin_tentativas"] = 0
+                        st.error("Limite de tentativas excedido. Acesso bloqueado por 2 minutos.")
+                    else:
+                        st.error(f"PIN incorreto ({tentativas}/5 tentativas).")
+    st.stop()
+
+
+_verificar_pin_acesso("Distribuidora de Bebidas — Estoque & PDV", "🍺")
 
 APP_KEY = "distribuidora_bebidas"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
