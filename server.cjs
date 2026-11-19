@@ -1011,10 +1011,10 @@ async function handler(req, res) {
     }
     const origin = req.headers && req.headers['origin'];
     const host = req.headers && req.headers['host'];
-    if (origin && host) {
+    if (origin && origin !== 'null' && host) {
       let originHost = '';
       try { originHost = new URL(origin).host; } catch (_) {}
-      if (originHost !== host) {
+      if (originHost && originHost !== host) {
         return send(res, 403, { error: 'Origem externa bloqueada por segurança (CSRF)' });
       }
     }

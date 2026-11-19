@@ -1236,7 +1236,11 @@
     var descJaItens = Math.max(0, Math.round((subPadraoTotal - sub) * 100) / 100);
     var maxDescRestante = Math.max(0, Math.round((subPadraoTotal * 0.10 - descJaItens) * 100) / 100);
     var descDigitado = toNum($('sd-desc').value);
-    var excedeuDesc = descDigitado > maxDescRestante + 0.005;
+    var excedeuDesc = subPadraoTotal > 0 && descDigitado > maxDescRestante + 0.005;
+    if (excedeuDesc) {
+      $('sd-desc').value = maxDescRestante.toFixed(2);
+      toast('Desconto máximo permitido é de 10% (' + brl(maxDescRestante) + ')', 'aviso');
+    }
     var desc = Math.min(descDigitado, maxDescRestante), total = Math.round((sub - desc) * 100) / 100;
     var pago = toNum($('sd-pago') ? $('sd-pago').value : 0);
     var troco = pago > total ? Math.round((pago - total) * 100) / 100 : 0;
@@ -1251,23 +1255,58 @@
     else if (aPrazo && cli.limite > 0 && cli.saldo + total > cli.limite) warn += '<div class="text-amber-300 text-[11px]">⚠️ Passa do limite de fiado do cliente.</div>';
     $('sd-resumo').innerHTML = venda ?
       '<div class="flex justify-between text-sm text-stone-300"><span>Cliente</span><span class="font-bold text-white">' + esc(cli ? cli.nome : 'Consumidor Final (Balcão)') + '</span></div>' +
-      '<div class="flex justify-between text-sm text-stone-300"><span>Subtotal</span><span>' + brl(sub) + '</span></div>' + (desc ? '<div class="flex justify-between text-sm text-stone-300"><span>Desconto</span><span>- ' + brl(desc) + '</span></div>' : '') +
+      '<div class="flex justify-between text-sm text-stone-300"><span>Subtotal</span><span>' + brl(sub) + '</span></div>' + (desc ? '<div class="flex justify-between text-sm text-stone-300"><span>Desconto (máx 10%)</span><span>- ' + brl(desc) + '</span></div>' : '') +
       '<div class="flex justify-between text-2xl font-extrabold text-amber-400"><span>Total a Pagar</span><span>' + brl(total) + '</span></div>' +
       (pago > 0 ? '<div class="flex justify-between text-sm font-bold ' + (pago >= total ? 'text-emerald-400' : 'text-rose-400') + '"><span>' + (pago >= total ? '💵 Troco a devolver' : 'Faltam') + '</span><span>' + brl(pago >= total ? troco : (total - pago)) + '</span></div>' : '') +
       '<div class="flex justify-between text-[11px] text-stone-400 pt-1 border-t border-stone-800"><span>Lucro da venda</span><span>' + brl(total - custo) + (total ? ' (' + Math.round((total - custo) / total * 100) + '%)' : '') + '</span></div>' + warn :
       '<div class="flex justify-between text-sm"><span>' + cart.length + ' item(ns)</span><span>Custo do estoque baixado: <b>' + brl(custo) + '</b></span></div>';
   };
   A.sdFinalizar = async function () {
-    var err = $('sd-err'); err.classList.add('hidden');
+    var err = $('sd-err'); if (err) err.classList.add('hidden');
     try {
-      if (!cart.length) throw new Error('Adicione ao menos um produto à venda');
+      // Se o operador selecionou um produto no campo de busca mas esqueceu de clicar em "+ Adicionar", adiciona automaticamente
+      if (!cart.length && $('sd-prod') && $('sd-prod').value.trim()) {
+        var pSel = saidaProd();
+        var qSel = qtdForm();
+        if (pSel && qSel > 0) {
+          if (qSel > disponivel(pSel)) throw new Error('Saldo insuficiente de ' + pSel.nome + ': disponível ' + fmtQtd(disponivel(pSel), pSel.unPorCx));
+          cart.push({ produtoId: pSel.id, qtd: qSel, subtotal: subtotalPadrao(pSel, qSel) });
+          $('sd-prod').value = ''; $('sd-cx').value = 0; $('sd-un').value = 1;
+          if ($('sd-info')) $('sd-info').innerHTML = '';
+          if ($('sd-prev')) $('sd-prev').textContent = '';
+          renderCart();
+        }
+      }
+      if (!cart.length) throw new Error('Adicione ao menos um produto ao carrinho antes de finalizar a venda.');
       var tipo = tipoSaida();
-      var r = await api('/api/saida', { tipo: tipo, clienteId: $('sd-cli').value, itens: cart.map(function (c) { return { produtoId: c.produtoId, qtd: c.qtd, subtotal: c.subtotal }; }), pagamento: $('sd-pag').value, desconto: toNum($('sd-desc').value), valorPago: toNum($('sd-pago') ? $('sd-pago').value : 0), vasilhameDevolvido: Math.round(toNum($('sd-vas').value)), obs: $('sd-obs').value });
-      cart = []; $('sd-desc').value = ''; if ($('sd-pago')) $('sd-pago').value = ''; $('sd-vas').value = 0; $('sd-obs').value = '';
-      await carregar(); renderAll();
+      var sub = 0, subPadraoTotal = 0;
+      cart.forEach(function (c) { var p = P(c.produtoId); if (!p) return; sub += c.subtotal; subPadraoTotal += subtotalPadrao(p, c.qtd); });
+      var descJaItens = Math.max(0, Math.round((subPadraoTotal - sub) * 100) / 100);
+      var maxDescRestante = Math.max(0, Math.round((subPadraoTotal * 0.10 - descJaItens) * 100) / 100);
+      var descFinal = Math.min(Math.max(0, toNum($('sd-desc') ? $('sd-desc').value : 0)), maxDescRestante);
+      var r = await api('/api/saida', {
+        tipo: tipo,
+        clienteId: $('sd-cli') ? $('sd-cli').value : '',
+        itens: cart.map(function (c) { return { produtoId: c.produtoId, qtd: c.qtd, subtotal: c.subtotal }; }),
+        pagamento: $('sd-pag') ? $('sd-pag').value : 'PIX',
+        desconto: descFinal,
+        valorPago: toNum($('sd-pago') ? $('sd-pago').value : 0),
+        vasilhameDevolvido: Math.round(toNum($('sd-vas') ? $('sd-vas').value : 0)),
+        obs: $('sd-obs') ? $('sd-obs').value : ''
+      });
+      cart = [];
+      if ($('sd-desc')) $('sd-desc').value = '';
+      if ($('sd-pago')) $('sd-pago').value = '';
+      if ($('sd-vas')) $('sd-vas').value = 0;
+      if ($('sd-obs')) $('sd-obs').value = '';
+      await carregar();
+      renderAll();
       toast('Venda #' + r.venda.numero + ' concluída!');
       A.verVenda(r.venda.id, true);
-    } catch (e) { err.textContent = e.message; err.classList.remove('hidden'); }
+    } catch (e) {
+      if (err) { err.textContent = e.message; err.classList.remove('hidden'); }
+      toast(e.message, 'erro');
+    }
   };
 
   // ---- ver / imprimir / estornar venda (cupom consumidor final)

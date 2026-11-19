@@ -286,7 +286,12 @@ bridge_script = f"""
   const os = {{ networkInterfaces: () => ({{}}) }};
   const fs = {{ existsSync: () => false, readFileSync: () => '{{}}', writeFileSync: () => {{}}, renameSync: () => {{}}, mkdirSync: () => {{}}, copyFileSync: () => {{}}, readdirSync: () => [], unlinkSync: () => {{}} }};
   const path = {{ join: () => '', dirname: () => '' }};
-  let tunnelUrl = (window.top && window.top.location ? window.top.location.href : window.location.href).split('?')[0];
+  let tunnelUrl = 'https://streamlit.app';
+  try {{
+    tunnelUrl = ((window.top && window.top.location && window.top.location.href) || document.referrer || window.location.href || 'https://streamlit.app').split('?')[0];
+  }} catch (_) {{
+    tunnelUrl = (document.referrer || 'https://streamlit.app').split('?')[0];
+  }}
 
   function sanitizarObjetoJson(obj, prof) {{
     if ((prof || 0) > 12) throw new Error('Estrutura JSON muito profunda');
@@ -335,7 +340,7 @@ bridge_script = f"""
       }});
       if (r.ok) {{
         const d = await r.json();
-        if (d && Array.isArray(d.produtos)) {{
+        if (d && Array.isArray(d.produtos) && (d.rev || 0) >= (cloudDb.rev || 0)) {{
           cloudDb = Object.assign(novoBanco(), d, {{
             config: Object.assign(novoBanco().config, d.config || {{}})
           }});
@@ -376,8 +381,9 @@ bridge_script = f"""
     let pathname = urlStr;
     let searchParams = new URLSearchParams();
     try {{
-      const u = new URL(urlStr, window.location.origin || 'https://streamlit.app');
-      if (u.origin === (window.location.origin || 'https://streamlit.app') || urlStr.startsWith('/api/')) {{
+      const baseOrigin = (window.location.origin && window.location.origin !== 'null') ? window.location.origin : 'https://streamlit.app';
+      const u = new URL(urlStr, baseOrigin);
+      if (u.origin === baseOrigin || urlStr.startsWith('/api/')) {{
         pathname = u.pathname;
         searchParams = u.searchParams;
       }}
