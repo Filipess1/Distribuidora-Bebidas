@@ -1,0 +1,10 @@
+{
+  "name": "distribuidora-bebidas",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Gestão de estoque (FEFO), vendas e clientes para distribuidora de bebidas",
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node teste.cjs"
+  }
+}

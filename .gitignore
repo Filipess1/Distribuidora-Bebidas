@@ -1,0 +1,9 @@
+node_modules/
+__pycache__/
+*.pyc
+*.tmp
+cloudflared.exe
+.streamlit/secrets.toml
+backups/
+dados_antes_de_zerar-*.json
+*.corrompido-*
