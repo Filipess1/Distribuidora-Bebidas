@@ -202,7 +202,7 @@ function registrarSaida(db, p, interno) {
   const hoje = hojeStr();
   const disp = new Map(db.lotes.map(l => [l.id, l.qtd]));
   const itens = [];
-  let subtotal = 0, custoTotal = 0, vasEmprestado = 0;
+  let subtotal = 0, subtotalTabela = 0, custoTotal = 0, vasEmprestado = 0;
 
   for (const it of p.itens) {
     const prod = db.produtos.find(x => x.id === it.produtoId);
@@ -224,14 +224,30 @@ function registrarSaida(db, p, interno) {
     if (falta > 0) {
       throw new Error('Saldo insuficiente de "' + prod.nome + '": faltam ' + falta + ' un' + (cfg.incluirVencidos ? '' : ' (lotes vencidos não são vendidos)'));
     }
-    const sub = cfg.venda ? money(it.subtotal !== undefined ? it.subtotal : qtd * prod.preco) : 0;
+    const precoCxPadrao = prod.precoCx > 0 ? prod.precoCx : Math.round(prod.preco * prod.unPorCx * 100) / 100;
+    const subPadrao = prod.unPorCx > 1
+      ? Math.round((Math.floor(qtd / prod.unPorCx) * precoCxPadrao + (qtd % prod.unPorCx) * prod.preco) * 100) / 100
+      : Math.round(qtd * prod.preco * 100) / 100;
+    const subMinimo = Math.round(subPadrao * 0.90 * 100) / 100;
+    const sub = cfg.venda ? money(it.subtotal !== undefined ? it.subtotal : subPadrao) : 0;
+    if (cfg.venda && sub < subMinimo - 0.01) {
+      throw new Error('Desconto no produto "' + prod.nome + '" excede o limite máximo de 10% (valor mínimo permitido: R$ ' + subMinimo.toFixed(2) + ')');
+    }
     const custo = Math.round(aloc.reduce((s, a) => s + a.qtd * a.custoUn, 0) * 100) / 100;
-    subtotal += sub; custoTotal += custo;
+    subtotal += sub; subtotalTabela += subPadrao; custoTotal += custo;
     if (prod.retornavel) vasEmprestado += Math.ceil(qtd / prod.unPorCx);
     itens.push({ produtoId: prod.id, nome: prod.nome, marca: prod.marca, volume: prod.volume, unPorCx: prod.unPorCx, retornavel: !!prod.retornavel, qtd, subtotal: sub, precoUn: qtd ? Math.round(sub / qtd * 10000) / 10000 : 0, custo, aloc });
   }
   subtotal = Math.round(subtotal * 100) / 100;
-  const desconto = cfg.venda ? Math.min(money(p.desconto), subtotal) : 0;
+  subtotalTabela = Math.round(subtotalTabela * 100) / 100;
+  const descontoInformado = cfg.venda ? money(p.desconto) : 0;
+  const maxDescontoPedido = Math.round(subtotal * 0.10 * 100) / 100;
+  const descontoJaNosItens = Math.max(0, Math.round((subtotalTabela - subtotal) * 100) / 100);
+  const maxDescontoGlobal = Math.round(subtotalTabela * 0.10 * 100) / 100;
+  if (cfg.venda && (descontoInformado > maxDescontoPedido + 0.01 || (descontoJaNosItens + descontoInformado) > maxDescontoGlobal + 0.01)) {
+    throw new Error('Desconto excede o limite máximo de 10% permitido (máx: R$ ' + Math.max(0, Math.round((maxDescontoGlobal - descontoJaNosItens) * 100) / 100).toFixed(2) + ')');
+  }
+  const desconto = cfg.venda ? Math.min(descontoInformado, maxDescontoPedido) : 0;
   const total = Math.round((subtotal - desconto) * 100) / 100;
   custoTotal = Math.round(custoTotal * 100) / 100;
 

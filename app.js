@@ -1104,7 +1104,7 @@
       '<div id="sd-venda-box" class="space-y-3"><div><label class="lbl">Forma de Pagamento</label><div class="grid grid-cols-2 gap-1.5 mb-2" id="sd-pag-btns">' +
       ['PIX', 'Dinheiro', 'Cartão de Débito', 'Cartão de Crédito'].map(function (pg) { return '<button type="button" onclick="A.sdSetPag(\'' + pg + '\')" data-pg="' + pg + '" class="btn btn-out !py-2 text-xs">' + (pg === 'PIX' ? '⚡ PIX' : pg === 'Dinheiro' ? '💵 Dinheiro' : pg === 'Cartão de Débito' ? '💳 Débito' : '💳 Crédito') + '</button>'; }).join('') +
       '</div><select id="sd-pag" class="inp">' + PAGAMENTOS.map(function (p) { return '<option>' + p + '</option>'; }).join('') + '</select></div>' +
-      '<div class="grid grid-cols-2 gap-3"><div><label class="lbl">Desconto (R$)</label><input id="sd-desc" type="number" min="0" step="0.01" class="inp" placeholder="0,00"></div><div id="sd-troco-box"><label class="lbl">Valor Recebido (Troco)</label><input id="sd-pago" type="number" min="0" step="0.01" class="inp" placeholder="Ex: 50,00"></div></div></div>' +
+      '<div class="grid grid-cols-2 gap-3"><div><label class="lbl">Desconto R$ (Máx. 10%)</label><input id="sd-desc" type="number" min="0" step="0.01" class="inp" placeholder="0,00 (máx 10%)"></div><div id="sd-troco-box"><label class="lbl">Valor Recebido (Troco)</label><input id="sd-pago" type="number" min="0" step="0.01" class="inp" placeholder="Ex: 50,00"></div></div></div>' +
       '<div id="sd-cli-box" class="pt-1 border-t border-stone-100"><label class="lbl">Cliente (Padrão: Consumidor Final)</label><div class="flex gap-2"><select id="sd-cli" class="inp"></select><button class="btn btn-out" onclick="A.cliModal(null,function(c){document.getElementById(\'sd-cli\').value=c.id;A.sdResumo();})" title="Cadastrar cliente p/ fiado ou casco">➕</button></div><div id="sd-cli-info" class="text-[11px] mt-1"></div></div>' +
       '<div id="sd-vas-box" class="hidden bg-lime-50 border border-lime-200 rounded-xl p-3 text-xs"><div id="sd-vas-txt" class="font-semibold text-lime-900 mb-2"></div><label class="lbl">Cascos / caixas devolvidas agora</label><input id="sd-vas" type="number" min="0" value="0" class="inp"></div>' +
       '<details class="text-xs text-stone-500"><summary class="cursor-pointer font-semibold">Mais opções (observação ou baixa por quebra/consumo)</summary><div class="space-y-2 pt-2"><div><label class="lbl">Tipo de saída</label><select id="sd-tipo" class="inp"></select></div><div><label class="lbl">Observação / Nome p/ entrega</label><input id="sd-obs" class="inp" placeholder="Opcional"></div></div></details>' +
@@ -1193,7 +1193,21 @@
     if (novo > disponivel(p)) return toast('Saldo máximo disponível: ' + fmtQtd(disponivel(p), p.unPorCx), 'erro');
     c.qtd = novo; c.subtotal = subtotalPadrao(p, novo); renderCart();
   };
-  A.cartPreco = function (i, v) { cart[i].subtotal = Math.round(toNum(v) * 100) / 100; A.sdResumo(); };
+  A.cartPreco = function (i, v) {
+    var c = cart[i]; if (!c) return;
+    var p = P(c.produtoId);
+    var val = Math.round(toNum(v) * 100) / 100;
+    if (p) {
+      var padrao = subtotalPadrao(p, c.qtd);
+      var minPermitido = Math.round(padrao * 0.90 * 100) / 100;
+      if (val < minPermitido - 0.005) {
+        val = minPermitido;
+        toast('Desconto máximo permitido por produto é de 10% (mínimo: ' + brl(minPermitido) + ')', 'aviso');
+      }
+    }
+    c.subtotal = val;
+    renderCart();
+  };
   function renderCart() {
     var box = $('sd-cart'); if (!box) return;
     var venda = tipoSaida() === 'Venda';
@@ -1217,9 +1231,13 @@
       b.className = 'btn !py-2 text-xs ' + (at ? 'btn-pri' : 'btn-out');
     });
     var cli = CL($('sd-cli').value);
-    var sub = 0, custo = 0, emprestar = 0;
-    cart.forEach(function (c) { var p = P(c.produtoId); if (!p) return; sub += c.subtotal; custo += c.qtd * (p.custo || 0); if (p.retornavel) emprestar += Math.ceil(c.qtd / p.unPorCx); });
-    var desc = Math.min(toNum($('sd-desc').value), sub), total = Math.round((sub - desc) * 100) / 100;
+    var sub = 0, subPadraoTotal = 0, custo = 0, emprestar = 0;
+    cart.forEach(function (c) { var p = P(c.produtoId); if (!p) return; sub += c.subtotal; subPadraoTotal += subtotalPadrao(p, c.qtd); custo += c.qtd * (p.custo || 0); if (p.retornavel) emprestar += Math.ceil(c.qtd / p.unPorCx); });
+    var descJaItens = Math.max(0, Math.round((subPadraoTotal - sub) * 100) / 100);
+    var maxDescRestante = Math.max(0, Math.round((subPadraoTotal * 0.10 - descJaItens) * 100) / 100);
+    var descDigitado = toNum($('sd-desc').value);
+    var excedeuDesc = descDigitado > maxDescRestante + 0.005;
+    var desc = Math.min(descDigitado, maxDescRestante), total = Math.round((sub - desc) * 100) / 100;
     var pago = toNum($('sd-pago') ? $('sd-pago').value : 0);
     var troco = pago > total ? Math.round((pago - total) * 100) / 100 : 0;
     var aPrazo = venda && /prazo|fiado/i.test(pg);
@@ -1228,8 +1246,9 @@
     var vb = $('sd-vas-box');
     if (venda && cli && (emprestar || cli.vasilhame)) { vb.classList.remove('hidden'); $('sd-vas-txt').textContent = 'Leva ' + emprestar + ' caixa(s)/casco(s) retornável. Cliente já tinha ' + (cli.vasilhame || 0) + ' pendente(s).'; } else vb.classList.add('hidden');
     var warn = '';
-    if (aPrazo && !cli) warn = '<div class="text-amber-300 text-[11px]">⚠️ Para vender fiado, escolha ou cadastre o cliente acima.</div>';
-    else if (aPrazo && cli.limite > 0 && cli.saldo + total > cli.limite) warn = '<div class="text-amber-300 text-[11px]">⚠️ Passa do limite de fiado do cliente.</div>';
+    if (excedeuDesc) warn += '<div class="text-rose-300 text-[11px] font-bold">🛑 Limite máximo de 10% de desconto (' + brl(maxDescRestante) + '). Valor ajustado para o teto de 10%.</div>';
+    if (aPrazo && !cli) warn += '<div class="text-amber-300 text-[11px]">⚠️ Para vender fiado, escolha ou cadastre o cliente acima.</div>';
+    else if (aPrazo && cli.limite > 0 && cli.saldo + total > cli.limite) warn += '<div class="text-amber-300 text-[11px]">⚠️ Passa do limite de fiado do cliente.</div>';
     $('sd-resumo').innerHTML = venda ?
       '<div class="flex justify-between text-sm text-stone-300"><span>Cliente</span><span class="font-bold text-white">' + esc(cli ? cli.nome : 'Consumidor Final (Balcão)') + '</span></div>' +
       '<div class="flex justify-between text-sm text-stone-300"><span>Subtotal</span><span>' + brl(sub) + '</span></div>' + (desc ? '<div class="flex justify-between text-sm text-stone-300"><span>Desconto</span><span>- ' + brl(desc) + '</span></div>' : '') +
@@ -1533,25 +1552,31 @@
     var m = MS(id); if (!m) return;
     if (!m.itens.length) return toast('Esta mesa não tem produtos consumidos ainda.', 'aviso');
     var total = m.itens.reduce(function (s, i) { return s + (Number(i.subtotal) || 0); }, 0);
+    var maxDescMesa = Math.round(total * 0.10 * 100) / 100;
     formModal({
       title: '💵 Fechar Conta — ' + m.mesa + ' (' + m.pessoa + ')',
-      subtitle: m.itens.length + ' produto(s) consumido(s) · Total: <b class="text-emerald-700">' + brl(total) + '</b>',
+      subtitle: m.itens.length + ' produto(s) consumido(s) · Total: <b class="text-emerald-700">' + brl(total) + '</b> · Desconto máx (10%): <b>' + brl(maxDescMesa) + '</b>',
       submit: '✅ Confirmar Recebimento & Baixar Estoque',
       fields: [
         { name: 'pagamento', label: 'Forma de Pagamento', type: 'select', options: PAGAMENTOS, value: 'PIX' },
-        { name: 'desconto', label: 'Desconto (R$)', type: 'number', step: '0.01', min: 0, value: '' },
+        { name: 'desconto', label: 'Desconto R$ (Máx. 10% = ' + brl(maxDescMesa) + ')', type: 'number', step: '0.01', min: 0, value: '', hint: 'Limite máximo permitido: 10% do valor total' },
         { name: 'valorPago', label: 'Valor Recebido p/ Troco (R$)', type: 'number', step: '0.01', min: 0, value: '' },
         { name: 'clienteId', label: 'Vincular a cliente cadastrado (só p/ fiado)', type: 'select', options: [{ v: '', t: '— Consumidor Final (' + m.pessoa + ') —' }].concat(S.clientes.map(function (c) { return { v: c.id, t: c.nome }; })), value: '' }
       ],
       onChange: function (f, info) {
-        var desc = Math.min(toNum(f.desconto), total);
+        var descDig = toNum(f.desconto);
+        var desc = Math.min(descDig, maxDescMesa);
         var liq = Math.round((total - desc) * 100) / 100;
         var pg = toNum(f.valorPago);
         var txt = 'Total líquido: <b>' + brl(liq) + '</b>';
+        if (descDig > maxDescMesa + 0.005) txt += ' · <span class="text-rose-700">⚠️ Desconto máximo permitido é 10% (' + brl(maxDescMesa) + ')</span>';
         if (pg > liq) txt += ' · 💵 Troco: <b>' + brl(pg - liq) + '</b>';
         info(txt);
       },
       onSubmit: async function (f) {
+        if (toNum(f.desconto) > maxDescMesa + 0.005) {
+          throw new Error('O desconto não pode ultrapassar 10% do total (máximo permitido: ' + brl(maxDescMesa) + ')');
+        }
         var r = await salvar('/api/mesa/fechar', { id: m.id, pagamento: f.pagamento, desconto: toNum(f.desconto), valorPago: toNum(f.valorPago), clienteId: f.clienteId }, 'Conta de ' + m.pessoa + ' fechada!');
         if (r && r.venda) A.verVenda(r.venda.id, true);
       }
