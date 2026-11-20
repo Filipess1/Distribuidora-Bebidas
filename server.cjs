@@ -406,18 +406,22 @@ const CATALOGO_DEMO = [
   ['Gelo Saborizado Maçã Verde p/ Copão 200ml', 'Coco Leve', 'Gelos & Gelos Saborizados', '200ml', 'Caixa', 30, 0, 57.0, 4.0, 1, 'Coco Leve', 'Freezer de Gelos Saborizados', 1, 365, '7898945612052'],
   ['Gelo Saborizado Limão p/ Copão 200ml', 'Coco Leve', 'Gelos & Gelos Saborizados', '200ml', 'Caixa', 30, 0, 57.0, 4.0, 1, 'Coco Leve', 'Freezer de Gelos Saborizados', 1, 365, '7898945612069'],
   ['Saco de Gelo Filtrado em Cubos 5kg', 'Gelo Cristal', 'Gelos & Gelos Saborizados', '5kg', 'Unidade', 1, 0, 6.5, 14.0, 15, 'Fábrica de Gelo', 'Freezer de Gelos Saborizados', 25, 365, '7898945612076'],
-  // Cigarros & Tabacaria (Souza Cruz / BAT 7891098, Philip Morris 7891167, BIC 3086123)
-  ['Cigarro Marlboro Red (Maço 20 un)', 'Marlboro', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 108.0, 13.0, 2, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 3, 720, '7891167001016'],
-  ['Cigarro Marlboro Gold / Light (Maço 20 un)', 'Marlboro', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 108.0, 13.0, 2, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891167001023'],
-  ['Cigarro Dunhill Carlton Blend (Maço 20 un)', 'Dunhill', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 112.0, 13.5, 2, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 3, 720, '7891098001017'],
-  ['Cigarro Lucky Strike Fresh / Mentolado (Maço 20 un)', 'Lucky Strike', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 92.0, 11.0, 2, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 3, 720, '7891098002014'],
-  ['Cigarro Rothmans Blue / Global (Maço 20 un)', 'Rothmans', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 68.0, 8.5, 2, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 3, 720, '7891098003011'],
-  ['Cigarro Chesterfield Remix / Blue (Maço 20 un)', 'Chesterfield', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 72.0, 9.0, 2, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891167003010'],
-  ['Cigarro de Palha Paulistinha / Jack Paiol (Maço 20 un)', 'Paulistinha', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 135.0, 18.0, 2, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7898912345017'],
-  ['Cigarro Fracionado (Unidade / Carteira) — Marlboro', 'Marlboro', 'Cigarros & Tabacaria', '20 un', 'Carteira (20 un)', 20, 0, 11.0, 1.50, 1, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891167009012'],
-  ['Cigarro Fracionado (Unidade / Carteira) — Dunhill / Carlton', 'Dunhill', 'Cigarros & Tabacaria', '20 un', 'Carteira (20 un)', 20, 0, 11.2, 1.50, 1, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891098009013'],
-  ['Cigarro Fracionado (Unidade / Carteira) — Lucky Strike / Rothmans', 'Lucky Strike / Rothmans', 'Cigarros & Tabacaria', '20 un', 'Carteira (20 un)', 20, 0, 8.0, 1.00, 1, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891098009020'],
-  ['Cigarro de Palha Fracionado (Unidade / Carteira)', 'Paulistinha', 'Cigarros & Tabacaria', '20 un', 'Carteira (20 un)', 20, 0, 13.6, 1.50, 1, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7898912349015'],
+  // Cigarros & Tabacaria — Carteiras Fechadas (20 un)
+  ['Cigarro Marlboro Red — Carteira (20 un)', 'Marlboro', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 108.0, 13.0, 2, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 3, 720, '7891167001016'],
+  ['Cigarro Marlboro Gold / Light — Carteira (20 un)', 'Marlboro', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 108.0, 13.0, 2, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891167001023'],
+  ['Cigarro Dunhill / Carlton — Carteira (20 un)', 'Dunhill', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 112.0, 13.5, 2, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 3, 720, '7891098001017'],
+  ['Cigarro Lucky Strike — Carteira (20 un)', 'Lucky Strike', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 92.0, 11.0, 2, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 3, 720, '7891098002014'],
+  ['Cigarro Rothmans — Carteira (20 un)', 'Rothmans', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 68.0, 8.5, 2, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 3, 720, '7891098003011'],
+  ['Cigarro Chesterfield — Carteira (20 un)', 'Chesterfield', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 72.0, 9.0, 2, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891167003010'],
+  ['Cigarro de Palha Paulistinha — Carteira (20 un)', 'Paulistinha', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 135.0, 18.0, 2, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7898912345017'],
+  // Cigarros vendidos por UNIDADE avulsa (produtos separados das carteiras, com estoque e preço próprios)
+  ['Cigarro Marlboro Red — Unidade (avulso)', 'Marlboro', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.55, 1.50, 20, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891167009012'],
+  ['Cigarro Marlboro Gold / Light — Unidade (avulso)', 'Marlboro', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.55, 1.50, 20, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891167009029'],
+  ['Cigarro Dunhill / Carlton — Unidade (avulso)', 'Dunhill', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.56, 1.50, 20, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891098009013'],
+  ['Cigarro Lucky Strike — Unidade (avulso)', 'Lucky Strike', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.46, 1.00, 20, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891098009020'],
+  ['Cigarro Rothmans — Unidade (avulso)', 'Rothmans', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.34, 1.00, 20, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891098009037'],
+  ['Cigarro Chesterfield — Unidade (avulso)', 'Chesterfield', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.36, 1.00, 20, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891167009036'],
+  ['Cigarro de Palha Paulistinha — Unidade (avulso)', 'Paulistinha', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.68, 1.50, 20, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7898912349015'],
   ['Tabaco para Enrolar / Fumo (Unidade)', 'Tabacaria Nacional', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 1.00, 2.50, 10, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 30, 720, '7898912349022'],
   ['Isqueiro BIC Maxi Tradicional (Unidade)', 'BIC', 'Cigarros & Tabacaria', '1 un', 'Cartela (12 un)', 12, 0, 48.0, 6.5, 2, 'BIC Brasil', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 1500, '3086123397293'],
   ['Seda Zomo / OCB King Size Slim (Livreto)', 'Zomo / OCB', 'Cigarros & Tabacaria', '33 folhas', 'Display (50 un)', 50, 0, 85.0, 4.0, 1, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 1, 1500, '7898959123018'],
@@ -540,10 +544,14 @@ function completarCatalogoDemo(db) {
       existente.nome = c[0];
       existente.marca = c[1];
       existente.categoria = c[2];
-      if (/Carteira \(20 un\)/.test(c[4]) && existente.unPorCx === 1) {
-        existente.tipoEmb = c[4];
-        existente.unPorCx = c[5];
+      // Cigarro avulso: garante que é vendido por UNIDADE (separado da carteira)
+      if (c[4] === 'Unidade' && /cigarro/i.test(c[0]) && existente.unPorCx !== 1) {
+        existente.tipoEmb = 'Unidade';
+        existente.unPorCx = 1;
         existente.volume = c[3];
+        existente.custo = Math.round(c[7] * 10000) / 10000;
+        existente.preco = c[8];
+        existente.precoCx = 0;
       }
       return;
     }
