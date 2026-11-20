@@ -235,17 +235,38 @@ def _inicializar_supabase_storage(sync_token: str):
         return row[0] if isinstance(row[0], dict) else json.loads(row[0])
 
 
-# Remove margens do Streamlit para o app ocupar 100% da tela
+# Remove margens do Streamlit para o app ocupar 100% da tela (responsivo no celular e PC)
 st.markdown("""
     <style>
-        #MainMenu, header, footer { visibility: hidden; height: 0; }
-        .block-container {
+        #MainMenu, header, footer, [data-testid="stToolbar"], [data-testid="stDecoration"] {
+            display: none !important;
+            height: 0 !important;
+        }
+        html, body, .stApp, [data-testid="stAppViewContainer"], .main {
+            max-width: 100vw !important;
+            overflow-x: hidden !important;
+            margin: 0 !important;
             padding: 0 !important;
+        }
+        .block-container, [data-testid="stMainBlockContainer"] {
+            padding: 0 !important;
+            margin: 0 !important;
             max-width: 100% !important;
+            width: 100% !important;
+        }
+        [data-testid="stElementContainer"], [data-testid="stIFrame"] {
+            width: 100% !important;
+            max-width: 100vw !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
         iframe {
             border: none !important;
             width: 100% !important;
+            max-width: 100vw !important;
+            height: 100dvh !important;
+            min-height: 100vh !important;
+            display: block !important;
         }
     </style>
 """, unsafe_allow_html=True)

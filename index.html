@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#b45309">
   <title>Distribuidora de Bebidas — Gestão de Estoque &amp; Vendas</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,7 +12,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
   <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%; }
     body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
+    .grid > *, .card { min-width: 0; }
+    @media (max-width: 640px) {
+      input, select, textarea, .inp { font-size: 16px !important; }
+      .btn { white-space: normal; text-align: center; }
+    }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-thumb { background: rgba(120, 113, 108, 0.4); border-radius: 4px; }
     @keyframes laser { 0%,100% { top: 10%; } 50% { top: 85%; } }
