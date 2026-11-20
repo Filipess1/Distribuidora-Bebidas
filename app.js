@@ -24,7 +24,7 @@
     'Outros': 'bg-slate-100 text-slate-700 border-slate-200'
   };
   var PAGAMENTOS = ['PIX', 'Dinheiro', 'Cartão de Débito', 'Cartão de Crédito', 'Fiado / A Prazo'];
-  var EMBALAGENS = ['Caixa', 'Fardo', 'Pack', 'Display', 'Pacote', 'Pacote (10 maços)', 'Cartela (12 un)', 'Display (50 un)', 'Pote', 'Barril 5L (100 doses)', 'Garrafa (20 doses)', 'Garrafa (18 doses)', 'Engradado', 'Barril', 'Galão', 'Unidade'];
+  var EMBALAGENS = ['Caixa', 'Fardo', 'Pack', 'Display', 'Pacote', 'Pacote (10 maços)', 'Carteira (20 un)', 'Cartela (12 un)', 'Display (50 un)', 'Pote', 'Barril 5L (100 doses)', 'Garrafa (20 doses)', 'Garrafa (18 doses)', 'Engradado', 'Barril', 'Galão', 'Unidade'];
   var TABS = [
     { id: 'dashboard', nome: 'Painel', ico: '📊' },
     { id: 'saida', nome: 'Balcão (PDV)', ico: '🛒' },
@@ -1141,7 +1141,7 @@
         '<div><div class="font-bold text-xs text-stone-900 leading-tight truncate" title="' + esc(p.nome) + '">' + (CAT_ICON[p.categoria] || '') + ' ' + esc(p.nome) + '</div>' +
         '<div class="text-[10px] text-stone-500">' + esc(p.marca) + ' ' + esc(p.volume) + ' · disp: <b>' + fmtQtd(e.validos, p.unPorCx) + '</b></div></div>' +
         '<div class="flex items-center gap-1 pt-1"><button type="button" onclick="A.sdQuick(\'' + p.id + '\',1)" class="btn btn-pri btn-sm flex-1">+1 un (' + brl(p.preco) + ')</button>' +
-        (p.unPorCx > 1 && e.validos >= p.unPorCx ? '<button type="button" onclick="A.sdQuick(\'' + p.id + '\',' + p.unPorCx + ')" class="btn btn-out btn-sm" title="Adicionar ' + esc(p.tipoEmb) + ' c/' + p.unPorCx + '">+1 cx</button>' : '') +
+        (p.unPorCx > 1 && e.validos >= p.unPorCx ? '<button type="button" onclick="A.sdQuick(\'' + p.id + '\',' + p.unPorCx + ')" class="btn btn-out btn-sm" title="Adicionar ' + esc(p.tipoEmb) + ' c/' + p.unPorCx + '">+1 ' + (/carteira/i.test(p.tipoEmb || '') ? 'carteira' : 'cx') + '</button>' : '') +
         '<button type="button" onclick="A.precoModal(\'' + p.id + '\')" class="btn btn-out btn-sm" title="Editar preço deste produto">💲</button>' +
         '</div></div>';
     }).join('');
@@ -1410,7 +1410,7 @@
           '<div><div class="font-bold text-xs text-stone-900 leading-tight truncate" title="' + esc(p.nome) + '">' + (CAT_ICON[p.categoria] || '') + ' ' + esc(p.nome) + '</div>' +
           '<div class="text-[10px] text-stone-500">' + esc(p.marca) + ' ' + esc(p.volume) + (naMesa ? ' · <b class="text-amber-700">na mesa: ' + naMesa + '</b>' : '') + '</div></div>' +
           '<div class="flex items-center gap-1 pt-1"><button type="button" onclick="A.addItemMesa(\'' + m.id + '\',\'' + p.id + '\',1)" class="btn btn-pri btn-sm flex-1">+1 (' + brl(p.preco) + ')</button>' +
-          (p.unPorCx > 1 && e.validos >= p.unPorCx ? '<button type="button" onclick="A.addItemMesa(\'' + m.id + '\',\'' + p.id + '\',' + p.unPorCx + ')" class="btn btn-out btn-sm" title="Adicionar ' + esc(p.tipoEmb) + ' c/' + p.unPorCx + '">+1 cx</button>' : '') +
+          (p.unPorCx > 1 && e.validos >= p.unPorCx ? '<button type="button" onclick="A.addItemMesa(\'' + m.id + '\',\'' + p.id + '\',' + p.unPorCx + ')" class="btn btn-out btn-sm" title="Adicionar ' + esc(p.tipoEmb) + ' c/' + p.unPorCx + '">+1 ' + (/carteira/i.test(p.tipoEmb || '') ? 'carteira' : 'cx') + '</button>' : '') +
           '<button type="button" onclick="A.precoModal(\'' + p.id + '\')" class="btn btn-out btn-sm" title="Editar preço deste produto">💲</button>' +
           '</div></div>';
       }).join('') : '<div class="col-span-full text-xs text-stone-400 py-4 text-center">Nenhum produto disponível nesta categoria.</div>') +
@@ -1512,7 +1512,7 @@
           '<div><div class="font-bold text-xs text-stone-900 leading-tight truncate" title="' + esc(p.nome) + '">' + (CAT_ICON[p.categoria] || '') + ' ' + esc(p.nome) + '</div>' +
           '<div class="text-[10px] text-stone-500">' + brl(p.preco) + '/un' + (naMesa ? ' · <b class="text-emerald-700">na mesa: ' + naMesa + '</b>' : '') + '</div></div>' +
           '<div class="flex gap-1"><button type="button" data-add="' + p.id + '" data-q="1" class="btn btn-pri btn-sm flex-1">+1 un</button>' +
-          (p.unPorCx > 1 && E[p.id].validos >= p.unPorCx ? '<button type="button" data-add="' + p.id + '" data-q="' + p.unPorCx + '" class="btn btn-out btn-sm">+1 cx</button>' : '') +
+          (p.unPorCx > 1 && E[p.id].validos >= p.unPorCx ? '<button type="button" data-add="' + p.id + '" data-q="' + p.unPorCx + '" class="btn btn-out btn-sm">+1 ' + (/carteira/i.test(p.tipoEmb || '') ? 'carteira' : 'cx') + '</button>' : '') +
           '</div></div>';
       }).join('') : '<div class="col-span-full text-xs text-stone-400 py-4 text-center">Nenhum produto encontrado.</div>';
 

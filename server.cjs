@@ -414,10 +414,10 @@ const CATALOGO_DEMO = [
   ['Cigarro Rothmans Blue / Global (Maço 20 un)', 'Rothmans', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 68.0, 8.5, 2, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 3, 720, '7891098003011'],
   ['Cigarro Chesterfield Remix / Blue (Maço 20 un)', 'Chesterfield', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 72.0, 9.0, 2, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891167003010'],
   ['Cigarro de Palha Paulistinha / Jack Paiol (Maço 20 un)', 'Paulistinha', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 135.0, 18.0, 2, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7898912345017'],
-  ['Cigarro Fracionado (Unidade Solta) — Marlboro', 'Marlboro', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.55, 1.50, 20, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891167009012'],
-  ['Cigarro Fracionado (Unidade Solta) — Dunhill / Carlton', 'Dunhill', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.56, 1.50, 20, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891098009013'],
-  ['Cigarro Fracionado (Unidade Solta) — Lucky Strike / Rothmans', 'Lucky Strike / Rothmans', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.40, 1.00, 20, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891098009020'],
-  ['Cigarro de Palha Fracionado (Unidade)', 'Paulistinha', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.68, 1.50, 20, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7898912349015'],
+  ['Cigarro Fracionado (Unidade / Carteira) — Marlboro', 'Marlboro', 'Cigarros & Tabacaria', '20 un', 'Carteira (20 un)', 20, 0, 11.0, 1.50, 1, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891167009012'],
+  ['Cigarro Fracionado (Unidade / Carteira) — Dunhill / Carlton', 'Dunhill', 'Cigarros & Tabacaria', '20 un', 'Carteira (20 un)', 20, 0, 11.2, 1.50, 1, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891098009013'],
+  ['Cigarro Fracionado (Unidade / Carteira) — Lucky Strike / Rothmans', 'Lucky Strike / Rothmans', 'Cigarros & Tabacaria', '20 un', 'Carteira (20 un)', 20, 0, 8.0, 1.00, 1, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891098009020'],
+  ['Cigarro de Palha Fracionado (Unidade / Carteira)', 'Paulistinha', 'Cigarros & Tabacaria', '20 un', 'Carteira (20 un)', 20, 0, 13.6, 1.50, 1, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7898912349015'],
   ['Tabaco para Enrolar / Fumo (Unidade)', 'Tabacaria Nacional', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 1.00, 2.50, 10, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 30, 720, '7898912349022'],
   ['Isqueiro BIC Maxi Tradicional (Unidade)', 'BIC', 'Cigarros & Tabacaria', '1 un', 'Cartela (12 un)', 12, 0, 48.0, 6.5, 2, 'BIC Brasil', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 1500, '3086123397293'],
   ['Seda Zomo / OCB King Size Slim (Livreto)', 'Zomo / OCB', 'Cigarros & Tabacaria', '33 folhas', 'Display (50 un)', 50, 0, 85.0, 4.0, 1, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 1, 1500, '7898959123018'],
@@ -540,6 +540,11 @@ function completarCatalogoDemo(db) {
       existente.nome = c[0];
       existente.marca = c[1];
       existente.categoria = c[2];
+      if (/Carteira \(20 un\)/.test(c[4]) && existente.unPorCx === 1) {
+        existente.tipoEmb = c[4];
+        existente.unPorCx = c[5];
+        existente.volume = c[3];
+      }
       return;
     }
     let ean = eanReal || ean13('789000000100');

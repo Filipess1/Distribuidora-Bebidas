@@ -341,7 +341,7 @@ bridge_script = f"""
   if (!cloudDb || typeof cloudDb !== 'object' || !Array.isArray(cloudDb.produtos)) {{
     cloudDb = novoBanco();
   }}
-  if (!cloudDb.produtos.length || !cloudDb.produtos.some(p => /fracionado|tabaco/i.test(p.nome || ''))) {{
+  if (!cloudDb.produtos.length || !cloudDb.produtos.some(p => /fracionado|tabaco/i.test(p.nome || '')) || cloudDb.produtos.some(p => /Cigarro.*Fracionado/i.test(p.nome || '') && p.unPorCx === 1)) {{
     try {{ completarCatalogoDemo(cloudDb); }} catch (_) {{}}
   }}
 
