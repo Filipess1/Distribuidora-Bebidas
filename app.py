@@ -62,9 +62,9 @@ def _gerar_sync_token() -> str:
 
 
 PERFIS_ROTULOS = {
-    "ceo": "👑 Dono / CEO (Acesso Total)",
-    "gerente": "💼 Gerente de Negócios (Acesso Total)",
-    "vendedor": "🛒 Vendedor (Acesso Limitado)",
+    "ceo": "👑 Dono / CEO",
+    "gerente": "💼 Gerente de Negócios",
+    "vendedor": "🛒 Vendedor",
 }
 
 
@@ -73,7 +73,7 @@ def _verificar_pin_acesso(titulo_app: str, icone: str):
     pins = _obter_pins_por_perfil()
 
     if st.session_state.get("pin_autenticado") and st.session_state.get("nivel_acesso") in pins:
-        return st.session_state["nivel_acesso"]
+        return st.session_state["nivel_acesso"], st.session_state.get("operador_nome", "")
 
     guard = _controle_forca_bruta_global()
     with guard["lock"]:
@@ -90,40 +90,51 @@ def _verificar_pin_acesso(titulo_app: str, icone: str):
         st.markdown("<div style='height: 10vh'></div>", unsafe_allow_html=True)
         with st.form("form_pin_acesso"):
             st.markdown(f"### {icone} {titulo_app}")
-            st.caption("Selecione seu nível de acesso e informe o PIN")
+            st.caption("Selecione o perfil, informe seu nome e o PIN")
             perfil = st.selectbox(
-                "Nível de Acesso:",
+                "Perfil:",
                 options=["ceo", "gerente", "vendedor"],
                 format_func=lambda k: PERFIS_ROTULOS[k],
             )
+            nome_operador = st.text_input(
+                "Seu Nome (identifica suas vendas):",
+                placeholder="Ex: João, Maria, Carlos",
+            )
             pin_digitado = st.text_input("Digite o PIN de acesso:", type="password")
-            entrar = st.form_submit_button("Desbloquear Sistema", type="primary", use_container_width=True)
+            entrar = st.form_submit_button("Entrar no Sistema", type="primary", use_container_width=True)
 
             if entrar:
-                pin_correto = pins.get(perfil, "")
-                if pin_digitado and hmac.compare_digest(pin_digitado.strip(), pin_correto):
-                    with guard["lock"]:
-                        guard["falhas"] = 0
-                        guard["bloqueado_ate"] = 0.0
-                    st.session_state["pin_autenticado"] = True
-                    st.session_state["nivel_acesso"] = perfil
-                    st.rerun()
+                nome_limpo = (nome_operador or "").strip()
+                if perfil == "vendedor" and not nome_limpo:
+                    st.warning("Informe seu nome para identificar suas vendas.")
                 else:
-                    time.sleep(1.0)
-                    with guard["lock"]:
-                        guard["falhas"] += 1
-                        tentativas = guard["falhas"]
-                        if tentativas >= 5:
-                            guard["bloqueado_ate"] = time.time() + 180.0
+                    pin_correto = pins.get(perfil, "")
+                    if pin_digitado and hmac.compare_digest(pin_digitado.strip(), pin_correto):
+                        with guard["lock"]:
                             guard["falhas"] = 0
-                    if tentativas >= 5:
-                        st.error("🔒 Limite de 5 tentativas excedido. Acesso bloqueado globalmente por 3 minutos.")
+                            guard["bloqueado_ate"] = 0.0
+                        if not nome_limpo:
+                            nome_limpo = "Dono / CEO" if perfil == "ceo" else "Gerente"
+                        st.session_state["pin_autenticado"] = True
+                        st.session_state["nivel_acesso"] = perfil
+                        st.session_state["operador_nome"] = nome_limpo
+                        st.rerun()
                     else:
-                        st.error(f"PIN incorreto ({tentativas}/5 tentativas).")
+                        time.sleep(1.0)
+                        with guard["lock"]:
+                            guard["falhas"] += 1
+                            tentativas = guard["falhas"]
+                            if tentativas >= 5:
+                                guard["bloqueado_ate"] = time.time() + 180.0
+                                guard["falhas"] = 0
+                        if tentativas >= 5:
+                            st.error("🔒 Limite de 5 tentativas excedido. Acesso bloqueado globalmente por 3 minutos.")
+                        else:
+                            st.error(f"PIN incorreto ({tentativas}/5 tentativas).")
     st.stop()
 
 
-nivel_acesso_atual = _verificar_pin_acesso("Distribuidora de Bebidas — Estoque & PDV", "🍺")
+nivel_acesso_atual, operador_atual = _verificar_pin_acesso("Distribuidora de Bebidas — Estoque & PDV", "🍺")
 
 
 def _novo_banco_padrao():
@@ -309,6 +320,20 @@ st.markdown("""
             align-items: center !important;
             margin: 0 !important;
         }
+        div[data-testid="stHorizontalBlock"] button {
+            background-color: #d97706 !important;
+            color: #ffffff !important;
+            border: 1px solid #f59e0b !important;
+            font-weight: 700 !important;
+            border-radius: 8px !important;
+        }
+        div[data-testid="stHorizontalBlock"] button:hover {
+            background-color: #b45309 !important;
+            border-color: #fbbf24 !important;
+        }
+        div[data-testid="stHorizontalBlock"] button p {
+            color: #ffffff !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -317,7 +342,8 @@ col_perfil, col_sair = st.columns([4, 1.4])
 with col_perfil:
     st.markdown(
         f"<div style='font-size:12px;font-weight:700;color:#fafaf9;padding:4px 0;'>"
-        f"🔐 Nível de Acesso: <span style='color:#fbbf24'>{PERFIS_ROTULOS.get(nivel_acesso_atual, nivel_acesso_atual)}</span>"
+        f"🔐 <span style='color:#fbbf24'>{PERFIS_ROTULOS.get(nivel_acesso_atual, nivel_acesso_atual)}</span>"
+        f" &nbsp;·&nbsp; 👤 <span style='color:#e7e5e4'>{operador_atual}</span>"
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -325,6 +351,7 @@ with col_sair:
     if st.button("🔒 Sair / Trocar Perfil", use_container_width=True, key="btn_trocar_perfil"):
         st.session_state.pop("pin_autenticado", None)
         st.session_state.pop("nivel_acesso", None)
+        st.session_state.pop("operador_nome", None)
         st.rerun()
 
 token_sincronizacao = _gerar_sync_token()
@@ -358,6 +385,7 @@ bridge_script = f"""
   const APP_KEY = {json.dumps(APP_KEY)};
   const SYNC_TOKEN = {json.dumps(token_sincronizacao)};
   const CURRENT_ROLE = {json.dumps(nivel_acesso_atual)};
+  const CURRENT_OPERATOR = {json.dumps(operador_atual)};
   const PORT = 443;
   const DATA_FILE = '';
   const BACKUP_DIR = '';
@@ -535,7 +563,14 @@ bridge_script = f"""
         }}
       }}
 
+      if (method === 'POST' && CURRENT_OPERATOR) {{
+        body.operador = CURRENT_OPERATOR;
+        cloudDb.config.operador = CURRENT_OPERATOR;
+      }}
       const resultado = rota(cloudDb, body, CURRENT_ROLE);
+      if (method === 'GET' && pathname === '/api/dados' && CURRENT_OPERATOR && resultado && resultado.config) {{
+        resultado.config.operador = CURRENT_OPERATOR;
+      }}
       if (method === 'POST') {{
         await pushSupabase();
       }}
