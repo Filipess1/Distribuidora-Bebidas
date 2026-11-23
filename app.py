@@ -506,7 +506,7 @@ bridge_script = f"""
   if (!cloudDb || typeof cloudDb !== 'object' || !Array.isArray(cloudDb.produtos)) {{
     cloudDb = novoBanco();
   }}
-  if (!cloudDb.produtos.length || !cloudDb.produtos.some(p => /Cigarro Picado — Rothmans/i.test(p.nome || '')) || cloudDb.produtos.some(p => /Picado|Unidade \(avulso\)/i.test(p.nome || '') && p.unPorCx !== 1)) {{
+  if (!cloudDb.produtos.length || !cloudDb.produtos.some(p => p.categoria === 'Cigarros Picados (Unidade)') || cloudDb.produtos.some(p => /Picado|Unidade \(avulso\)/i.test(p.nome || '') && p.unPorCx !== 1)) {{
     try {{ completarCatalogoDemo(cloudDb); }} catch (_) {{}}
   }}
 

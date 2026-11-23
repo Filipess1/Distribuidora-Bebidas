@@ -23,7 +23,7 @@ let tunnelProc = null;
 const CATEGORIAS = [
   'Cervejas', 'Barris de Alambique (Doses)', 'Refrigerantes', 'Águas', 'Sucos & Chás',
   'Energéticos & Isotônicos', 'Whiskies & Destilados', 'Doses & Drinks', 'Gelos & Gelos Saborizados',
-  'Cigarros & Tabacaria', 'Vinhos & Espumantes',
+  'Cigarros & Tabacaria', 'Cigarros Picados (Unidade)', 'Vinhos & Espumantes',
   'Salgadinhos & Petiscos', 'Miojos & Massas Rápidas', 'Biscoitos & Bolachas', 'Chocolates & Doces', 'Outros'
 ];
 const DEPOSITOS = [
@@ -439,13 +439,13 @@ const CATALOGO_DEMO = [
   ['Cigarro Chesterfield — Carteira (20 un)', 'Chesterfield', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 72.0, 9.0, 2, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891167003010'],
   ['Cigarro de Palha Paulistinha — Carteira (20 un)', 'Paulistinha', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 135.0, 18.0, 2, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7898912345017'],
   // Cigarros picados (vendidos exclusivamente por 1 UNIDADE avulsa)
-  ['Cigarro Picado — Marlboro Red (Unidade)', 'Marlboro', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 11.0, 1.50, 20, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891167009012'],
-  ['Cigarro Picado — Marlboro Gold / Light (Unidade)', 'Marlboro', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 11.0, 1.50, 20, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891167009029'],
-  ['Cigarro Picado — Dunhill / Carlton (Unidade)', 'Dunhill', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 11.2, 1.50, 20, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891098009013'],
-  ['Cigarro Picado — Lucky Strike (Unidade)', 'Lucky Strike', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 9.2, 1.00, 20, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891098009020'],
-  ['Cigarro Picado — Rothmans (Unidade)', 'Rothmans', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 6.8, 1.00, 20, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891098009037'],
-  ['Cigarro Picado — Chesterfield (Unidade)', 'Chesterfield', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 7.2, 1.00, 20, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891167009036'],
-  ['Cigarro de Palha Picado — Paulistinha (Unidade)', 'Paulistinha', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 13.6, 1.50, 20, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7898912349015'],
+  ['Cigarro Picado — Marlboro Red (Unidade)', 'Marlboro', 'Cigarros Picados (Unidade)', '1 un', 'Unidade', 1, 0, 11.0, 1.50, 20, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891167009012'],
+  ['Cigarro Picado — Marlboro Gold / Light (Unidade)', 'Marlboro', 'Cigarros Picados (Unidade)', '1 un', 'Unidade', 1, 0, 11.0, 1.50, 20, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891167009029'],
+  ['Cigarro Picado — Dunhill / Carlton (Unidade)', 'Dunhill', 'Cigarros Picados (Unidade)', '1 un', 'Unidade', 1, 0, 11.2, 1.50, 20, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891098009013'],
+  ['Cigarro Picado — Lucky Strike (Unidade)', 'Lucky Strike', 'Cigarros Picados (Unidade)', '1 un', 'Unidade', 1, 0, 9.2, 1.00, 20, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891098009020'],
+  ['Cigarro Picado — Rothmans (Unidade)', 'Rothmans', 'Cigarros Picados (Unidade)', '1 un', 'Unidade', 1, 0, 6.8, 1.00, 20, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891098009037'],
+  ['Cigarro Picado — Chesterfield (Unidade)', 'Chesterfield', 'Cigarros Picados (Unidade)', '1 un', 'Unidade', 1, 0, 7.2, 1.00, 20, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891167009036'],
+  ['Cigarro de Palha Picado — Paulistinha (Unidade)', 'Paulistinha', 'Cigarros Picados (Unidade)', '1 un', 'Unidade', 1, 0, 13.6, 1.50, 20, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7898912349015'],
   ['Tabaco para Enrolar / Fumo (Unidade)', 'Tabacaria Nacional', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 1.00, 2.50, 10, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 30, 720, '7898912349022'],
   ['Isqueiro BIC Maxi Tradicional (Unidade)', 'BIC', 'Cigarros & Tabacaria', '1 un', 'Cartela (12 un)', 12, 0, 48.0, 6.5, 2, 'BIC Brasil', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 1500, '3086123397293'],
   ['Seda Zomo / OCB King Size Slim (Livreto)', 'Zomo / OCB', 'Cigarros & Tabacaria', '33 folhas', 'Display (50 un)', 50, 0, 85.0, 4.0, 1, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 1, 1500, '7898959123018'],

@@ -6,7 +6,7 @@
   var CAT_ICON = {
     'Cervejas': '🍺', 'Barris de Alambique (Doses)': '🛢️', 'Chopp & Barris': '🛢️', 'Refrigerantes': '🥤', 'Águas': '💧', 'Sucos & Chás': '🧃',
     'Energéticos & Isotônicos': '⚡', 'Whiskies & Destilados': '🥃', 'Destilados': '🥃', 'Doses & Drinks': '🍸',
-    'Gelos & Gelos Saborizados': '🧊', 'Cigarros & Tabacaria': '🚬',
+    'Gelos & Gelos Saborizados': '🧊', 'Cigarros & Tabacaria': '🚬', 'Cigarros Picados (Unidade)': '🚬',
     'Vinhos & Espumantes': '🍷', 'Salgadinhos & Petiscos': '🍟', 'Miojos & Massas Rápidas': '🍜',
     'Biscoitos & Bolachas': '🍪', 'Chocolates & Doces': '🍫', 'Outros': '🧴'
   };
@@ -18,6 +18,7 @@
     'Doses & Drinks': 'bg-orange-100 text-orange-900 border-orange-300',
     'Gelos & Gelos Saborizados': 'bg-cyan-100 text-cyan-900 border-cyan-300',
     'Cigarros & Tabacaria': 'bg-stone-200 text-stone-900 border-stone-400',
+    'Cigarros Picados (Unidade)': 'bg-amber-100 text-amber-900 border-amber-400',
     'Vinhos & Espumantes': 'bg-purple-100 text-purple-800 border-purple-200',
     'Salgadinhos & Petiscos': 'bg-yellow-50 text-amber-900 border-amber-300', 'Miojos & Massas Rápidas': 'bg-rose-50 text-rose-800 border-rose-200',
     'Biscoitos & Bolachas': 'bg-orange-50 text-orange-800 border-orange-200', 'Chocolates & Doces': 'bg-pink-100 text-pink-900 border-pink-300',
@@ -1153,7 +1154,8 @@
     var cats = [''].concat(S.categorias.filter(function (c) { return S.produtos.some(function (p) { return p.categoria === c && E[p.id] && E[p.id].validos > 0; }); }));
     pills.innerHTML = cats.map(function (c) {
       var at = vitrineCat === c;
-      return '<button type="button" onclick="A.sdVitCat(\'' + esc(c) + '\')" class="px-2 py-0.5 rounded-full text-[11px] font-bold border cursor-pointer ' + (at ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-stone-600 border-stone-300') + '">' + (c ? (CAT_ICON[c] || '') + ' ' + esc(c.split(' ')[0]) : 'Todos') + '</button>';
+      var lbl = c === 'Cigarros Picados (Unidade)' ? 'Cigarro Picado' : (c ? c.split(' ')[0] : 'Todos');
+      return '<button type="button" onclick="A.sdVitCat(\'' + esc(c) + '\')" class="px-2 py-0.5 rounded-full text-[11px] font-bold border cursor-pointer ' + (at ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-stone-600 border-stone-300') + '">' + (c ? (CAT_ICON[c] || '') + ' ' + esc(lbl) : 'Todos') + '</button>';
     }).join('');
     var prods = S.produtos.filter(function (p) { return (!vitrineCat || p.categoria === vitrineCat) && E[p.id] && E[p.id].validos > 0; });
     if (!prods.length) { box.innerHTML = '<div class="col-span-full text-xs text-stone-400 py-3 text-center">Sem produtos com estoque válido nesta categoria.</div>'; return; }
@@ -1425,7 +1427,8 @@
       '<button type="submit" class="btn btn-pri">➕ Anotar na Mesa</button></form>' +
       '<div class="flex gap-1 flex-wrap">' + cats.map(function (c) {
         var at = mesaCat === c;
-        return '<button type="button" onclick="A.setMesaCat(\'' + esc(c) + '\')" class="px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer ' + (at ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-stone-600 border-stone-300') + '">' + (c ? (CAT_ICON[c] || '') + ' ' + esc(c.split(' ')[0]) : 'Todos') + '</button>';
+        var lbl = c === 'Cigarros Picados (Unidade)' ? 'Cigarro Picado' : (c ? c.split(' ')[0] : 'Todos');
+        return '<button type="button" onclick="A.setMesaCat(\'' + esc(c) + '\')" class="px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer ' + (at ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-stone-600 border-stone-300') + '">' + (c ? (CAT_ICON[c] || '') + ' ' + esc(lbl) : 'Todos') + '</button>';
       }).join('') + '</div>' +
       '<div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-80 overflow-y-auto pr-1">' +
       (prods.length ? prods.map(function (p) {
@@ -1517,7 +1520,8 @@
       var boxCats = el.querySelector('#lcm-cats');
       boxCats.innerHTML = cats.map(function (c) {
         var at = catModal === c;
-        return '<button type="button" data-c="' + esc(c) + '" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold border cursor-pointer ' + (at ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-stone-600 border-stone-300') + '">' + (c ? (CAT_ICON[c] || '') + ' ' + esc(c.split(' ')[0]) : 'Todos') + '</button>';
+        var lbl = c === 'Cigarros Picados (Unidade)' ? 'Cigarro Picado' : (c ? c.split(' ')[0] : 'Todos');
+        return '<button type="button" data-c="' + esc(c) + '" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold border cursor-pointer ' + (at ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-stone-600 border-stone-300') + '">' + (c ? (CAT_ICON[c] || '') + ' ' + esc(lbl) : 'Todos') + '</button>';
       }).join('');
       boxCats.querySelectorAll('[data-c]').forEach(function (b) {
         b.onclick = function () { catModal = b.getAttribute('data-c'); desenhar(); };
