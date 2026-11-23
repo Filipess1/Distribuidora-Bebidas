@@ -438,14 +438,14 @@ const CATALOGO_DEMO = [
   ['Cigarro Rothmans — Carteira (20 un)', 'Rothmans', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 68.0, 8.5, 2, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 3, 720, '7891098003011'],
   ['Cigarro Chesterfield — Carteira (20 un)', 'Chesterfield', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 72.0, 9.0, 2, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891167003010'],
   ['Cigarro de Palha Paulistinha — Carteira (20 un)', 'Paulistinha', 'Cigarros & Tabacaria', '20 un', 'Pacote (10 maços)', 10, 0, 135.0, 18.0, 2, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7898912345017'],
-  // Cigarros vendidos por UNIDADE avulsa (produtos separados das carteiras, com estoque e preço próprios)
-  ['Cigarro Marlboro Red — Unidade (avulso)', 'Marlboro', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.55, 1.50, 20, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891167009012'],
-  ['Cigarro Marlboro Gold / Light — Unidade (avulso)', 'Marlboro', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.55, 1.50, 20, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891167009029'],
-  ['Cigarro Dunhill / Carlton — Unidade (avulso)', 'Dunhill', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.56, 1.50, 20, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891098009013'],
-  ['Cigarro Lucky Strike — Unidade (avulso)', 'Lucky Strike', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.46, 1.00, 20, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891098009020'],
-  ['Cigarro Rothmans — Unidade (avulso)', 'Rothmans', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.34, 1.00, 20, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891098009037'],
-  ['Cigarro Chesterfield — Unidade (avulso)', 'Chesterfield', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.36, 1.00, 20, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7891167009036'],
-  ['Cigarro de Palha Paulistinha — Unidade (avulso)', 'Paulistinha', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 0.68, 1.50, 20, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 40, 720, '7898912349015'],
+  // Cigarros vendidos por UNIDADE (+1 un = 1 cigarro) ou CAIXA/MAÇO com 20 unidades (+1 cx = 20 cigarros)
+  ['Cigarro Marlboro Red — Unidade (avulso)', 'Marlboro', 'Cigarros & Tabacaria', '1 un / cx 20', 'Caixa (20 un)', 20, 0, 11.0, 1.50, 1, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891167009012', 13.0],
+  ['Cigarro Marlboro Gold / Light — Unidade (avulso)', 'Marlboro', 'Cigarros & Tabacaria', '1 un / cx 20', 'Caixa (20 un)', 20, 0, 11.0, 1.50, 1, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891167009029', 13.0],
+  ['Cigarro Dunhill / Carlton — Unidade (avulso)', 'Dunhill', 'Cigarros & Tabacaria', '1 un / cx 20', 'Caixa (20 un)', 20, 0, 11.2, 1.50, 1, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891098009013', 13.5],
+  ['Cigarro Lucky Strike — Unidade (avulso)', 'Lucky Strike', 'Cigarros & Tabacaria', '1 un / cx 20', 'Caixa (20 un)', 20, 0, 9.2, 1.00, 1, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891098009020', 11.0],
+  ['Cigarro Rothmans — Unidade (avulso)', 'Rothmans', 'Cigarros & Tabacaria', '1 un / cx 20', 'Caixa (20 un)', 20, 0, 6.8, 1.00, 1, 'BAT / Souza Cruz', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891098009037', 8.5],
+  ['Cigarro Chesterfield — Unidade (avulso)', 'Chesterfield', 'Cigarros & Tabacaria', '1 un / cx 20', 'Caixa (20 un)', 20, 0, 7.2, 1.00, 1, 'Philip Morris', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7891167009036', 9.0],
+  ['Cigarro de Palha Paulistinha — Unidade (avulso)', 'Paulistinha', 'Cigarros & Tabacaria', '1 un / cx 20', 'Caixa (20 un)', 20, 0, 13.6, 1.50, 1, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 720, '7898912349015', 18.0],
   ['Tabaco para Enrolar / Fumo (Unidade)', 'Tabacaria Nacional', 'Cigarros & Tabacaria', '1 un', 'Unidade', 1, 0, 1.00, 2.50, 10, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 30, 720, '7898912349022'],
   ['Isqueiro BIC Maxi Tradicional (Unidade)', 'BIC', 'Cigarros & Tabacaria', '1 un', 'Cartela (12 un)', 12, 0, 48.0, 6.5, 2, 'BIC Brasil', 'Gôndola & Balcão (Mercearia/Tabacaria)', 2, 1500, '3086123397293'],
   ['Seda Zomo / OCB King Size Slim (Livreto)', 'Zomo / OCB', 'Cigarros & Tabacaria', '33 folhas', 'Display (50 un)', 50, 0, 85.0, 4.0, 1, 'Tabacaria Nacional', 'Gôndola & Balcão (Mercearia/Tabacaria)', 1, 1500, '7898959123018'],
@@ -568,14 +568,14 @@ function completarCatalogoDemo(db) {
       existente.nome = c[0];
       existente.marca = c[1];
       existente.categoria = c[2];
-      // Cigarro avulso: garante que é vendido por UNIDADE (separado da carteira) com preço unitário
-      if (c[4] === 'Unidade' && /cigarro/i.test(c[0]) && (existente.unPorCx !== 1 || existente.preco >= 5)) {
-        existente.tipoEmb = 'Unidade';
-        existente.unPorCx = 1;
+      // Cigarro avulso: +1 un = 1 cigarro, +1 cx = caixa com 20 cigarros (precoCx)
+      if (c[4] === 'Caixa (20 un)' && /cigarro/i.test(c[0])) {
+        existente.tipoEmb = 'Caixa (20 un)';
+        existente.unPorCx = 20;
         existente.volume = c[3];
-        existente.custo = Math.round(c[7] * 10000) / 10000;
+        existente.custo = Math.round((c[7] / 20) * 10000) / 10000;
         existente.preco = c[8];
-        existente.precoCx = 0;
+        existente.precoCx = c[15] || 0;
       }
       return;
     }
@@ -587,7 +587,7 @@ function completarCatalogoDemo(db) {
     }
     const p = criarProduto(db, {
       nome: c[0], marca: c[1], categoria: c[2], volume: c[3], tipoEmb: c[4], unPorCx: c[5], retornavel: !!c[6],
-      custo: c[7] / c[5], preco: c[8], minimo: c[9] * c[5], fornecedor: c[10], depositoPadrao: c[11],
+      custo: c[7] / c[5], preco: c[8], precoCx: c[15] || 0, minimo: c[9] * c[5], fornecedor: c[10], depositoPadrao: c[11],
       ean
     });
     aplicarEntrada(db, {

@@ -1161,7 +1161,7 @@
       var e = E[p.id];
       var ehMaco = /ma[cç]os?/i.test(p.tipoEmb || '');
       var rotUn = ehMaco ? '+1 maço' : '+1 un';
-      var rotCx = /carteira/i.test(p.tipoEmb || '') ? '+1 carteira' : (ehMaco ? '+1 pct' : '+1 cx');
+      var rotCx = ehMaco ? '+1 pct' : '+1 cx';
       return '<div class="border border-stone-200 rounded-xl p-2.5 bg-stone-50/70 hover:bg-amber-50/50 flex flex-col justify-between gap-1.5">' +
         '<div><div class="font-bold text-xs text-stone-900 leading-tight truncate" title="' + esc(p.nome) + '">' + (CAT_ICON[p.categoria] || '') + ' ' + esc(p.nome) + '</div>' +
         '<div class="text-[10px] text-stone-500">' + esc(p.marca) + ' ' + esc(p.volume) + ' · disp: <b>' + fmtQtd(e.validos, p.unPorCx) + '</b></div></div>' +
