@@ -630,21 +630,53 @@ function carregarDemo(db) {
   hist(db, { tipo: 'Sistema', produto: 'Dados de demonstração carregados', lote: '-', qtd: 0, unPorCx: 1, motivo: 'Exemplos fictícios (códigos de barras de teste)' });
 }
 
-// ---------------------------------------------------------------- rotas da API
+// ---------------------------------------------------------------- rotas da API & RBAC
+function exigirGerencia(role, msg) {
+  if (role === 'vendedor') {
+    throw new Error(msg || 'Acesso negado: recurso exclusivo do Dono/CEO ou Gerente de Negócios.');
+  }
+}
+
+function filtrarDadosPorPerfil(db, role) {
+  const r = (role === 'vendedor' || role === 'gerente' || role === 'ceo') ? role : 'ceo';
+  let produtos = db.produtos;
+  let lotes = db.lotes;
+  let vendas = db.vendas.slice(0, 1500);
+  let historico = db.historico.slice(0, 2000);
+
+  if (r === 'vendedor') {
+    produtos = produtos.map(p => Object.assign({}, p, { custo: 0 }));
+    lotes = lotes.map(l => Object.assign({}, l, { custo: 0 }));
+    vendas = vendas.map(v => Object.assign({}, v, {
+      custoTotal: 0,
+      itens: (v.itens || []).map(it => Object.assign({}, it, {
+        custo: 0,
+        aloc: (it.aloc || []).map(a => Object.assign({}, a, { custoUn: 0 }))
+      }))
+    }));
+    historico = historico.map(h => Object.assign({}, h, {
+      valor: /^Entrada|Ajuste/i.test(h.tipo || '') ? 0 : h.valor
+    }));
+  }
+
+  return {
+    rev: db.rev, hoje: hojeStr(), role: r, tunnelUrl, wifiUrl: 'http://' + getLocalIp() + ':' + PORT,
+    config: { empresa: db.config.empresa, operador: db.config.operador, pinAtivo: !!db.config.pin },
+    categorias: CATEGORIAS, depositos: DEPOSITOS, tiposSaida: Object.keys(TIPOS_SAIDA),
+    produtos, lotes, clientes: db.clientes, mesas: db.mesas || [], vendas, historico
+  };
+}
+
 const rotas = {};
 const R_GET = (p, fn) => { rotas['GET ' + p] = fn; };
 const R_POST = (p, fn) => { rotas['POST ' + p] = fn; };
 
-R_GET('/api/dados', (db) => ({
-  rev: db.rev, hoje: hojeStr(), tunnelUrl, wifiUrl: 'http://' + getLocalIp() + ':' + PORT,
-  config: { empresa: db.config.empresa, operador: db.config.operador, pinAtivo: !!db.config.pin },
-  categorias: CATEGORIAS, depositos: DEPOSITOS, tiposSaida: Object.keys(TIPOS_SAIDA),
-  produtos: db.produtos, lotes: db.lotes, clientes: db.clientes, mesas: db.mesas || [], vendas: db.vendas.slice(0, 1500), historico: db.historico.slice(0, 2000)
-}));
+R_GET('/api/dados', (db, _b, role) => filtrarDadosPorPerfil(db, role));
 R_GET('/api/rev', (db) => ({ rev: db.rev }));
 R_GET('/api/info', () => ({ ip: getLocalIp(), port: PORT, wifiUrl: 'http://' + getLocalIp() + ':' + PORT, tunnelUrl }));
 
-R_POST('/api/config', (db, b) => {
+R_POST('/api/config', (db, b, role) => {
+  exigirGerencia(role, 'Acesso negado: vendedores não podem alterar ajustes ou PIN.');
   if (b.empresa !== undefined) db.config.empresa = str(b.empresa, 80) || 'Distribuidora de Bebidas';
   if (b.operador !== undefined) db.config.operador = str(b.operador, 60) || 'Responsável Depósito';
   if (b.pin !== undefined) {
@@ -655,9 +687,21 @@ R_POST('/api/config', (db, b) => {
   return { success: true };
 });
 
-R_POST('/api/produto', (db, b) => {
+R_POST('/api/produto', (db, b, role) => {
   const idx = b.id ? db.produtos.findIndex(p => p.id === b.id) : -1;
   if (b.id && idx === -1) throw new Error('Produto não encontrado');
+  if (role === 'vendedor') {
+    if (idx >= 0) {
+      const atual = db.produtos[idx];
+      if ((b.preco !== undefined && money(b.preco) !== atual.preco) ||
+          (b.precoCx !== undefined && money(b.precoCx) !== atual.precoCx) ||
+          (b.custo !== undefined && money4(b.custo) !== atual.custo)) {
+        throw new Error('Acesso negado: vendedores não podem editar preços ou custos dos produtos.');
+      }
+    } else {
+      throw new Error('Acesso negado: apenas Dono/CEO ou Gerente podem cadastrar novos produtos com preço.');
+    }
+  }
   const p = normProduto(b, idx >= 0 ? db.produtos[idx] : null);
   checarEanUnico(db, p);
   if (idx >= 0) {
@@ -670,7 +714,8 @@ R_POST('/api/produto', (db, b) => {
   }
   return { success: true, produto: p };
 });
-R_POST('/api/produto/excluir', (db, b) => {
+R_POST('/api/produto/excluir', (db, b, role) => {
+  exigirGerencia(role, 'Acesso negado: vendedores não podem excluir produtos.');
   const p = db.produtos.find(x => x.id === b.id);
   if (!p) throw new Error('Produto não encontrado');
   const lotes = db.lotes.filter(l => l.produtoId === p.id);
@@ -681,7 +726,8 @@ R_POST('/api/produto/excluir', (db, b) => {
   hist(db, { tipo: 'Exclusão', produtoId: p.id, produto: p.nome, lote: '-', qtd: saldo, unPorCx: p.unPorCx, motivo: 'Produto excluído do cadastro' });
   return { success: true };
 });
-R_POST('/api/produto/precos', (db, b) => {
+R_POST('/api/produto/precos', (db, b, role) => {
+  exigirGerencia(role, 'Acesso negado: vendedores não podem editar os preços dos produtos.');
   const itens = Array.isArray(b.itens) ? b.itens : [b];
   let alterados = 0;
   itens.forEach(it => {
@@ -909,12 +955,14 @@ R_POST('/api/cliente/vasilhame', (db, b) => {
   return { success: true, vasilhame: c.vasilhame };
 });
 
-R_POST('/api/demo', (db) => { carregarDemo(db); return { success: true }; });
-R_POST('/api/demo/completar', (db) => {
+R_POST('/api/demo', (db, _b, role) => { exigirGerencia(role); carregarDemo(db); return { success: true }; });
+R_POST('/api/demo/completar', (db, _b, role) => {
+  exigirGerencia(role);
   const adicionados = completarCatalogoDemo(db);
   return { success: true, adicionados };
 });
-R_POST('/api/zerar', (db, b) => {
+R_POST('/api/zerar', (db, b, role) => {
+  exigirGerencia(role, 'Acesso negado: vendedores não podem zerar os dados.');
   if (b.confirmacao !== 'ZERAR') throw new Error('Confirmação inválida');
   const pin = db.config.pin, cfg = db.config;
   try { fs.copyFileSync(DATA_FILE, path.join(__dirname, 'dados_antes_de_zerar-' + Date.now() + '.json')); } catch (_) {}
@@ -1091,8 +1139,9 @@ async function handler(req, res) {
 
     const rota = rotas[req.method + ' ' + pathname];
     if (!rota) return send(res, 404, { error: 'Rota não encontrada' });
+    const reqRole = str((req.headers && req.headers['x-role']) || 'ceo', 20).toLowerCase();
     const body = req.method === 'POST' ? await readBody(req) : {};
-    const resultado = rota(db, body);
+    const resultado = rota(db, body, reqRole);
     if (req.method === 'POST') save(db);
     return send(res, 200, resultado);
   } catch (e) {

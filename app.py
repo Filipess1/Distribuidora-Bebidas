@@ -29,9 +29,29 @@ def _controle_forca_bruta_global():
     return {"lock": threading.Lock(), "falhas": 0, "bloqueado_ate": 0.0}
 
 
+def _obter_pins_por_perfil() -> dict:
+    pin_ceo = str(
+        st.secrets.get("PIN_CEO")
+        or st.secrets.get("APP_PIN")
+        or os.environ.get("PIN_CEO")
+        or os.environ.get("APP_PIN")
+        or "2026"
+    ).strip() or "2026"
+    pin_gerente = str(
+        st.secrets.get("PIN_GERENTE") or os.environ.get("PIN_GERENTE") or "2027"
+    ).strip() or "2027"
+    pin_vendedor = str(
+        st.secrets.get("PIN_VENDEDOR") or os.environ.get("PIN_VENDEDOR") or "1234"
+    ).strip() or "1234"
+    return {
+        "ceo": pin_ceo,
+        "gerente": pin_gerente,
+        "vendedor": pin_vendedor,
+    }
+
+
 def _obter_pin_esperado() -> str:
-    pin = str(st.secrets.get("APP_PIN", os.environ.get("APP_PIN", "2026"))).strip()
-    return pin or "2026"
+    return _obter_pins_por_perfil()["ceo"]
 
 
 def _gerar_sync_token() -> str:
@@ -41,12 +61,19 @@ def _gerar_sync_token() -> str:
     return hmac.new(segredo, APP_KEY.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
+PERFIS_ROTULOS = {
+    "ceo": "👑 Dono / CEO (Acesso Total)",
+    "gerente": "💼 Gerente de Negócios (Acesso Total)",
+    "vendedor": "🛒 Vendedor (Acesso Limitado)",
+}
+
+
 def _verificar_pin_acesso(titulo_app: str, icone: str):
     """Bloqueia o acesso no servidor Streamlit antes de carregar dados ou chaves do Supabase."""
-    pin_esperado = _obter_pin_esperado()
+    pins = _obter_pins_por_perfil()
 
-    if st.session_state.get("pin_autenticado"):
-        return True
+    if st.session_state.get("pin_autenticado") and st.session_state.get("nivel_acesso") in pins:
+        return st.session_state["nivel_acesso"]
 
     guard = _controle_forca_bruta_global()
     with guard["lock"]:
@@ -58,21 +85,28 @@ def _verificar_pin_acesso(titulo_app: str, icone: str):
         st.error(f"🔒 Muitas tentativas incorretas. Sistema bloqueado por {restante}s.")
         st.stop()
 
-    _, col_centro, _ = st.columns([1, 1.3, 1])
+    _, col_centro, _ = st.columns([1, 1.4, 1])
     with col_centro:
-        st.markdown("<div style='height: 12vh'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 10vh'></div>", unsafe_allow_html=True)
         with st.form("form_pin_acesso"):
             st.markdown(f"### {icone} {titulo_app}")
-            st.caption("Acesso blindado por PIN de segurança no servidor")
+            st.caption("Selecione seu nível de acesso e informe o PIN")
+            perfil = st.selectbox(
+                "Nível de Acesso:",
+                options=["ceo", "gerente", "vendedor"],
+                format_func=lambda k: PERFIS_ROTULOS[k],
+            )
             pin_digitado = st.text_input("Digite o PIN de acesso:", type="password")
             entrar = st.form_submit_button("Desbloquear Sistema", type="primary", use_container_width=True)
 
             if entrar:
-                if pin_digitado and hmac.compare_digest(pin_digitado.strip(), pin_esperado):
+                pin_correto = pins.get(perfil, "")
+                if pin_digitado and hmac.compare_digest(pin_digitado.strip(), pin_correto):
                     with guard["lock"]:
                         guard["falhas"] = 0
                         guard["bloqueado_ate"] = 0.0
                     st.session_state["pin_autenticado"] = True
+                    st.session_state["nivel_acesso"] = perfil
                     st.rerun()
                 else:
                     time.sleep(1.0)
@@ -89,7 +123,7 @@ def _verificar_pin_acesso(titulo_app: str, icone: str):
     st.stop()
 
 
-_verificar_pin_acesso("Distribuidora de Bebidas — Estoque & PDV", "🍺")
+nivel_acesso_atual = _verificar_pin_acesso("Distribuidora de Bebidas — Estoque & PDV", "🍺")
 
 
 def _novo_banco_padrao():
@@ -264,12 +298,34 @@ st.markdown("""
             border: none !important;
             width: 100% !important;
             max-width: 100vw !important;
-            height: 100dvh !important;
-            min-height: 100vh !important;
+            height: calc(100dvh - 46px) !important;
+            min-height: calc(100vh - 46px) !important;
             display: block !important;
+        }
+        div[data-testid="stHorizontalBlock"] {
+            padding: 4px 12px !important;
+            background: #1c1917 !important;
+            color: #fafaf9 !important;
+            align-items: center !important;
+            margin: 0 !important;
         }
     </style>
 """, unsafe_allow_html=True)
+
+# Barra superior discreta com perfil logado e botão de Sair / Trocar Perfil
+col_perfil, col_sair = st.columns([4, 1.4])
+with col_perfil:
+    st.markdown(
+        f"<div style='font-size:12px;font-weight:700;color:#fafaf9;padding:4px 0;'>"
+        f"🔐 Nível de Acesso: <span style='color:#fbbf24'>{PERFIS_ROTULOS.get(nivel_acesso_atual, nivel_acesso_atual)}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+with col_sair:
+    if st.button("🔒 Sair / Trocar Perfil", use_container_width=True, key="btn_trocar_perfil"):
+        st.session_state.pop("pin_autenticado", None)
+        st.session_state.pop("nivel_acesso", None)
+        st.rerun()
 
 token_sincronizacao = _gerar_sync_token()
 try:
@@ -301,6 +357,7 @@ bridge_script = f"""
   const SUPABASE_KEY = {json.dumps(supabase_key)};
   const APP_KEY = {json.dumps(APP_KEY)};
   const SYNC_TOKEN = {json.dumps(token_sincronizacao)};
+  const CURRENT_ROLE = {json.dumps(nivel_acesso_atual)};
   const PORT = 443;
   const DATA_FILE = '';
   const BACKUP_DIR = '';
@@ -433,6 +490,9 @@ bridge_script = f"""
       }}
 
       if (method === 'GET' && pathname === '/api/backup') {{
+        if (CURRENT_ROLE === 'vendedor') {{
+          return jsonResp({{ error: 'Acesso negado: vendedores não podem baixar backup.' }}, 403);
+        }}
         const copia = JSON.parse(JSON.stringify(cloudDb));
         if (copia.config) copia.config.pin = '';
         return jsonResp(copia, 200);
@@ -475,7 +535,7 @@ bridge_script = f"""
         }}
       }}
 
-      const resultado = rota(cloudDb, body);
+      const resultado = rota(cloudDb, body, CURRENT_ROLE);
       if (method === 'POST') {{
         await pushSupabase();
       }}

@@ -79,6 +79,7 @@
   }
   function P(id) { for (var i = 0; i < S.produtos.length; i++) if (S.produtos[i].id === id) return S.produtos[i]; return null; }
   function CL(id) { for (var i = 0; i < S.clientes.length; i++) if (S.clientes[i].id === id) return S.clientes[i]; return null; }
+  function ehVendedor() { return S.role === 'vendedor'; }
   function precoCxEf(p) { return p.precoCx > 0 ? p.precoCx : Math.round(p.preco * p.unPorCx * 100) / 100; }
   function rotuloProd(p) { return p.nome + (p.marca ? ' — ' + p.marca : '') + (p.ean ? ' · ' + p.ean : ''); }
   function toNum(v) { var n = Number(String(v === undefined || v === null ? '' : v).replace(',', '.')); return isFinite(n) ? n : 0; }
@@ -442,14 +443,22 @@
       '<header class="card p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">' +
       '<div class="flex items-center gap-4"><div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-600 to-stone-800 flex items-center justify-center text-3xl shadow-md flex-shrink-0 cursor-pointer" onclick="A.tab(\'dashboard\')">🍺</div>' +
       '<div><h1 id="h-empresa" class="text-xl sm:text-2xl font-extrabold text-stone-900 leading-tight"></h1><p class="text-xs text-stone-500">Venda Rápida ao Consumidor Final (PDV) · Estoque FEFO · Vasilhames</p><div id="h-status" class="mt-1"></div></div></div>' +
-      '<div class="flex flex-wrap gap-2"><button class="btn btn-pri" onclick="A.tab(\'saida\')">🛒 Venda Rápida (PDV)</button><button class="btn btn-green" onclick="A.tab(\'mesas\')">🪑 Mesas / Consumo Local</button><button class="btn btn-out" onclick="A.tabelaPrecosModal()">💲 Editar Preços</button><button class="btn btn-dark" onclick="A.scanGlobal()">📷 Escanear</button><button class="btn btn-out" onclick="A.celular()">📱 Celular</button><button class="btn btn-out" onclick="A.config()">⚙️ Ajustes</button></div></header>' +
+      '<div class="flex flex-wrap gap-2"><button class="btn btn-pri" onclick="A.tab(\'saida\')">🛒 Venda Rápida (PDV)</button><button class="btn btn-green" onclick="A.tab(\'mesas\')">🪑 Mesas / Consumo Local</button><button id="btn-hdr-precos" class="btn btn-out" onclick="A.tabelaPrecosModal()">💲 Editar Preços</button><button class="btn btn-dark" onclick="A.scanGlobal()">📷 Escanear</button><button class="btn btn-out" onclick="A.celular()">📱 Celular</button><button id="btn-hdr-config" class="btn btn-out" onclick="A.config()">⚙️ Ajustes</button></div></header>' +
       '<nav id="nav" class="flex gap-1.5 overflow-x-auto pb-1 border-b border-stone-300 text-sm font-semibold"></nav>' +
       TABS.map(function (t) { return '<section id="tab-' + t.id + '" class="hidden"><div id="v-' + t.id + '" class="space-y-5"></div></section>'; }).join('');
     mountEstoque(); mountReposicao(); mountEntrada(); mountSaida(); mountMesas(); mountClientes(); mountDepositos(); mountHistorico();
   }
   function renderStatus() {
     var el = $('h-status'); if (!el) return;
-    el.innerHTML = online ? '<span class="badge bg-emerald-50 text-emerald-700 border-emerald-200">● Online · sincronizando</span>' : '<span class="badge bg-rose-50 text-rose-700 border-rose-300">● Servidor offline</span>';
+    var roleBadge = '';
+    if (S.role === 'ceo') roleBadge = ' <span class="badge bg-amber-50 text-amber-800 border-amber-300">👑 Dono / CEO</span>';
+    else if (S.role === 'gerente') roleBadge = ' <span class="badge bg-sky-50 text-sky-800 border-sky-300">💼 Gerente</span>';
+    else if (S.role === 'vendedor') roleBadge = ' <span class="badge bg-stone-100 text-stone-700 border-stone-300">🛒 Vendedor (Limitado)</span>';
+    el.innerHTML = (online ? '<span class="badge bg-emerald-50 text-emerald-700 border-emerald-200">● Online · sincronizando</span>' : '<span class="badge bg-rose-50 text-rose-700 border-rose-300">● Servidor offline</span>') + roleBadge;
+    if ($('btn-hdr-precos')) $('btn-hdr-precos').classList.toggle('hidden', ehVendedor());
+    if ($('btn-hdr-config')) $('btn-hdr-config').classList.toggle('hidden', ehVendedor());
+    if ($('btn-est-precos')) $('btn-est-precos').classList.toggle('hidden', ehVendedor());
+    if ($('btn-est-novo')) $('btn-est-novo').classList.toggle('hidden', ehVendedor());
   }
   function renderNav() {
     var rep = calcReposicao().filter(function (x) { return x.nivel !== 'ok'; }).length;
@@ -507,17 +516,23 @@
     var rep = calcReposicao().filter(function (x) { return x.nivel !== 'ok'; });
     var zerados = rep.filter(function (x) { return x.nivel === 'zerado'; }).length;
 
-    var cards = '<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">' +
-      kpi('Vendas hoje', brl(soma(vHoje)), vHoje.length + ' pedido(s)', '💰', 'bg-emerald-50') +
-      kpi('Vendas no mês', brl(soma(vMes)), 'Lucro bruto ' + brl(lucroMes) + (soma(vMes) ? ' (' + Math.round(lucroMes / soma(vMes) * 100) + '%)' : ''), '📈', 'bg-amber-50') +
-      kpi('Estoque (custo)', brl(valCusto), nf(Math.round(cxEq)) + ' caixas · ' + nf(totalUn) + ' un', '📦', 'bg-sky-50') +
-      kpi('Estoque (venda)', brl(valVenda), 'Margem potencial ' + brl(valVenda - valCusto), '🏷️', 'bg-violet-50') +
-      kpi('A receber (fiado)', brl(aReceber), S.clientes.filter(function (c) { return c.saldo > 0; }).length + ' cliente(s) devendo', '🧾', aReceber > 0 ? 'bg-rose-50' : 'bg-stone-50') +
-      kpi('Vencendo ≤ 30 dias', nCrit + ' lote(s)', nVenc ? '<b class="text-rose-600">' + nVenc + ' lote(s) VENCIDO(S)</b>' : 'Nenhum lote vencido', '⏳', nCrit || nVenc ? 'bg-amber-100' : 'bg-stone-50') +
-      kpi('Precisam de reposição', rep.length + ' produto(s)', zerados ? '<b class="text-rose-600">' + zerados + ' zerado(s)</b>' : 'Nenhum zerado', '🛒', rep.length ? 'bg-rose-50' : 'bg-stone-50') +
-      kpi('Vasilhames em campo', nf(vasil) + ' cx', 'Engradados/caixas com clientes', '♻️', 'bg-lime-50') + '</div>';
+    var cards = ehVendedor()
+      ? '<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">' +
+        kpi('Itens em estoque', nf(totalUn) + ' un', nf(Math.round(cxEq)) + ' caixas equivalentes', '📦', 'bg-sky-50') +
+        kpi('Vencendo ≤ 30 dias', nCrit + ' lote(s)', nVenc ? '<b class="text-rose-600">' + nVenc + ' lote(s) VENCIDO(S)</b>' : 'Nenhum lote vencido', '⏳', nCrit || nVenc ? 'bg-amber-100' : 'bg-stone-50') +
+        kpi('Precisam de reposição', rep.length + ' produto(s)', zerados ? '<b class="text-rose-600">' + zerados + ' zerado(s)</b>' : 'Nenhum zerado', '🛒', rep.length ? 'bg-rose-50' : 'bg-stone-50') +
+        kpi('Vasilhames em campo', nf(vasil) + ' cx', 'Engradados/caixas com clientes', '♻️', 'bg-lime-50') + '</div>'
+      : '<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">' +
+        kpi('Vendas hoje', brl(soma(vHoje)), vHoje.length + ' pedido(s)', '💰', 'bg-emerald-50') +
+        kpi('Vendas no mês', brl(soma(vMes)), 'Lucro bruto ' + brl(lucroMes) + (soma(vMes) ? ' (' + Math.round(lucroMes / soma(vMes) * 100) + '%)' : ''), '📈', 'bg-amber-50') +
+        kpi('Estoque (custo)', brl(valCusto), nf(Math.round(cxEq)) + ' caixas · ' + nf(totalUn) + ' un', '📦', 'bg-sky-50') +
+        kpi('Estoque (venda)', brl(valVenda), 'Margem potencial ' + brl(valVenda - valCusto), '🏷️', 'bg-violet-50') +
+        kpi('A receber (fiado)', brl(aReceber), S.clientes.filter(function (c) { return c.saldo > 0; }).length + ' cliente(s) devendo', '🧾', aReceber > 0 ? 'bg-rose-50' : 'bg-stone-50') +
+        kpi('Vencendo ≤ 30 dias', nCrit + ' lote(s)', nVenc ? '<b class="text-rose-600">' + nVenc + ' lote(s) VENCIDO(S)</b>' : 'Nenhum lote vencido', '⏳', nCrit || nVenc ? 'bg-amber-100' : 'bg-stone-50') +
+        kpi('Precisam de reposição', rep.length + ' produto(s)', zerados ? '<b class="text-rose-600">' + zerados + ' zerado(s)</b>' : 'Nenhum zerado', '🛒', rep.length ? 'bg-rose-50' : 'bg-stone-50') +
+        kpi('Vasilhames em campo', nf(vasil) + ' cx', 'Engradados/caixas com clientes', '♻️', 'bg-lime-50') + '</div>';
 
-    // gráfico 7 dias
+    // gráfico 7 dias (oculto para vendedor)
     var dias = [], max = 1;
     for (var i = 6; i >= 0; i--) {
       var d = new Date(); d.setDate(d.getDate() - i);
@@ -525,7 +540,7 @@
       var tot = soma(vOk.filter(function (v) { return diaLocal(new Date(v.data)) === key; }));
       dias.push({ lbl: pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1), tot: tot }); if (tot > max) max = tot;
     }
-    var graf = '<div class="card p-5"><h3 class="font-extrabold text-stone-900 mb-3">Vendas dos últimos 7 dias</h3><div class="flex items-end gap-2 h-40">' +
+    var graf = ehVendedor() ? '' : '<div class="card p-5"><h3 class="font-extrabold text-stone-900 mb-3">Vendas dos últimos 7 dias</h3><div class="flex items-end gap-2 h-40">' +
       dias.map(function (x) { return '<div class="flex-1 flex flex-col items-center justify-end h-full gap-1"><span class="text-[10px] font-bold text-stone-600">' + (x.tot ? nf(Math.round(x.tot)) : '') + '</span><div class="w-full rounded-t-lg bg-gradient-to-t from-amber-600 to-amber-400" style="height:' + Math.max(2, x.tot / max * 100) + '%"></div><span class="text-[10px] text-stone-500">' + x.lbl + '</span></div>'; }).join('') + '</div></div>';
 
     // mais vendidos
@@ -545,7 +560,7 @@
     // por categoria / depósitos
     var porCat = {}; S.lotes.forEach(function (l) { var p = P(l.produtoId); if (p) porCat[p.categoria] = (porCat[p.categoria] || 0) + l.qtd * (l.custo || p.custo || 0); });
     var maxCat = Math.max.apply(null, Object.keys(porCat).map(function (k) { return porCat[k]; }).concat([1]));
-    var catH = '<div class="card p-5"><h3 class="font-extrabold text-stone-900 mb-3">Capital parado por categoria</h3>' + Object.keys(porCat).sort(function (a, b) { return porCat[b] - porCat[a]; }).map(function (k) {
+    var catH = ehVendedor() ? '' : '<div class="card p-5"><h3 class="font-extrabold text-stone-900 mb-3">Capital parado por categoria</h3>' + Object.keys(porCat).sort(function (a, b) { return porCat[b] - porCat[a]; }).map(function (k) {
       return '<div class="mb-2.5"><div class="flex justify-between text-xs mb-1"><span class="font-semibold">' + (CAT_ICON[k] || '') + ' ' + esc(k) + '</span><span class="text-stone-500">' + brl(porCat[k]) + '</span></div>' + barra(porCat[k] / maxCat * 100, 'bg-stone-700') + '</div>';
     }).join('') + '</div>';
     var depH = '<div class="card p-5"><h3 class="font-extrabold text-stone-900 mb-3">Ocupação dos depósitos</h3>' + S.depositos.map(function (d) {
@@ -556,7 +571,7 @@
     // últimas vendas
     var ult = S.vendas.slice(0, 6);
     var ultH = '<div class="card p-5"><div class="flex items-center justify-between mb-3"><h3 class="font-extrabold text-stone-900">Últimos pedidos</h3><button class="btn btn-out btn-sm" onclick="A.tab(\'historico\')">Ver todos</button></div>' + (ult.length ? ult.map(function (v) {
-      return '<div class="flex items-center justify-between py-2 border-b border-stone-100 last:border-0 cursor-pointer" onclick="A.verVenda(\'' + v.id + '\')"><div><div class="text-sm font-bold">#' + v.numero + ' · ' + esc(v.clienteNome) + '</div><div class="text-[11px] text-stone-500">' + fmtData(v.data) + ' · ' + esc(v.tipo) + (v.status === 'Estornada' ? ' · ESTORNADO' : '') + '</div></div><div class="text-sm font-extrabold ' + (v.status === 'Estornada' ? 'line-through text-stone-400' : '') + '">' + (v.tipo === 'Venda' ? brl(v.total) : '—') + '</div></div>';
+      return '<div class="flex items-center justify-between py-2 border-b border-stone-100 last:border-0 cursor-pointer" onclick="A.verVenda(\'' + v.id + '\')"><div><div class="text-sm font-bold">#' + v.numero + ' · ' + esc(v.clienteNome) + '</div><div class="text-[11px] text-stone-500">' + fmtData(v.data) + ' · ' + esc(v.tipo) + (v.status === 'Estornada' ? ' · ESTORNADO' : '') + '</div></div><div class="text-sm font-extrabold ' + (v.status === 'Estornada' ? 'line-through text-stone-400' : '') + '">' + (ehVendedor() ? '—' : (v.tipo === 'Venda' ? brl(v.total) : '—')) + '</div></div>';
     }).join('') : '<p class="text-sm text-stone-400">Nenhum pedido ainda.</p>') + '</div>';
 
     root.innerHTML = cards + '<div class="grid lg:grid-cols-3 gap-4"><div class="lg:col-span-2 space-y-4">' + graf + alH + '</div><div class="space-y-4">' + topH + ultH + '</div></div><div class="grid md:grid-cols-2 gap-4">' + catH + depH + '</div>';
@@ -575,7 +590,7 @@
       '<div><label class="lbl">Categoria</label><select id="est-cat" class="inp"></select></div>' +
       '<div><label class="lbl">Depósito</label><select id="est-dep" class="inp"></select></div>' +
       '<div><label class="lbl">Situação</label><select id="est-st" class="inp"><option value="">Todas</option><option value="critico">Vencendo ≤ 30 dias</option><option value="vencidos">Com lote vencido</option><option value="baixo">Abaixo do mínimo</option><option value="sem">Sem estoque</option></select></div>' +
-      '<div class="flex gap-2 flex-wrap"><button class="btn btn-out" onclick="A.tabelaPrecosModal()">💲 Editar Preços</button><button class="btn btn-pri" onclick="A.produtoModal()">➕ Produto</button><button class="btn btn-out" onclick="A.exportarEstoque()">⬇️ CSV</button></div></div>' +
+      '<div class="flex gap-2 flex-wrap"><button id="btn-est-precos" class="btn btn-out" onclick="A.tabelaPrecosModal()">💲 Editar Preços</button><button id="btn-est-novo" class="btn btn-pri" onclick="A.produtoModal()">➕ Produto</button><button class="btn btn-out" onclick="A.exportarEstoque()">⬇️ CSV</button></div></div>' +
       '<div id="est-list" class="card overflow-x-auto"></div>';
     $('est-q').oninput = function () { F.estBusca = this.value; renderEstoque(); };
     $('est-cat').onchange = function () { F.estCat = this.value; renderEstoque(); };
@@ -609,12 +624,12 @@
         '<td>' + badge((CAT_ICON[p.categoria] || '') + ' ' + esc(p.categoria), CAT_COR[p.categoria] || CAT_COR.Outros) + '</td>' +
         '<td><div class="font-extrabold ' + (e.total <= 0 ? 'text-rose-600' : '') + '">' + fmtQtd(e.total, p.unPorCx) + '</div><div class="text-[10px] text-stone-400">' + nf(e.total) + ' un' + (e.vencidos ? ' · <b class="text-rose-600">' + nf(e.vencidos) + ' vencidas</b>' : '') + '</div>' + minTxt + '</td>' +
         '<td>' + (pv ? badge(pv.label, pv.cls) : '<span class="text-stone-400">—</span>') + '</td>' +
-        '<td><div class="font-semibold">' + brl(p.preco) + ' <span class="text-stone-400 font-normal">/ ' + brl(precoCxEf(p)) + '</span></div><div class="text-[10px] text-stone-400">custo ' + brl(p.custo) + (margem !== null ? ' · margem ' + margem + '%' : '') + '</div></td>' +
-        '<td class="text-right whitespace-nowrap"><button class="btn btn-out btn-sm" onclick="A.precoModal(\'' + p.id + '\')" title="Editar preço do produto">💲 Preço</button> <button class="btn btn-green btn-sm" onclick="A.entradaPara(\'' + p.id + '\')" title="Dar entrada">📥</button> <button class="btn btn-out btn-sm" onclick="A.saidaPara(\'' + p.id + '\')" title="Vender / dar saída">🚚</button> <button class="btn btn-out btn-sm" onclick="A.produtoModal(\'' + p.id + '\')" title="Editar produto">✏️</button></td></tr>';
+        '<td><div class="font-semibold">' + brl(p.preco) + ' <span class="text-stone-400 font-normal">/ ' + brl(precoCxEf(p)) + '</span></div>' + (ehVendedor() ? '' : ('<div class="text-[10px] text-stone-400">custo ' + brl(p.custo) + (margem !== null ? ' · margem ' + margem + '%' : '') + '</div>')) + '</td>' +
+        '<td class="text-right whitespace-nowrap">' + (ehVendedor() ? '' : ('<button class="btn btn-out btn-sm" onclick="A.precoModal(\'' + p.id + '\')" title="Editar preço do produto">💲 Preço</button> ')) + '<button class="btn btn-green btn-sm" onclick="A.entradaPara(\'' + p.id + '\')" title="Dar entrada">📥</button> <button class="btn btn-out btn-sm" onclick="A.saidaPara(\'' + p.id + '\')" title="Vender / dar saída">🚚</button>' + (ehVendedor() ? '' : (' <button class="btn btn-out btn-sm" onclick="A.produtoModal(\'' + p.id + '\')" title="Editar produto">✏️</button>')) + '</td></tr>';
       if (expandido[p.id]) {
-        h += '<tr><td colspan="6" class="!p-0 bg-stone-50"><div class="px-4 py-3">' + (e.lotes.length ? '<table class="w-full bg-white rounded-xl overflow-hidden border border-stone-200"><thead><tr><th>Lote</th><th>Validade</th><th>Local</th><th>Quantidade</th><th>Custo un</th><th class="text-right">Ações</th></tr></thead><tbody>' + e.lotes.map(function (l, i) {
+        h += '<tr><td colspan="6" class="!p-0 bg-stone-50"><div class="px-4 py-3">' + (e.lotes.length ? '<table class="w-full bg-white rounded-xl overflow-hidden border border-stone-200"><thead><tr><th>Lote</th><th>Validade</th><th>Local</th><th>Quantidade</th>' + (ehVendedor() ? '' : '<th>Custo un</th>') + '<th class="text-right">Ações</th></tr></thead><tbody>' + e.lotes.map(function (l, i) {
           var st = statusVal(l.validade);
-          return '<tr><td class="font-mono font-bold">' + esc(l.lote) + (i === 0 && st.k !== 'vencido' ? ' <span class="badge bg-amber-100 text-amber-800 border-amber-300">sai 1º</span>' : '') + '</td><td>' + fmtDia(l.validade) + ' ' + badge(st.label, st.cls) + '</td><td>' + esc(l.deposito) + (l.posicao ? ' · ' + esc(l.posicao) : '') + '</td><td class="font-bold">' + fmtQtd(l.qtd, p.unPorCx) + ' <span class="text-stone-400 font-normal">(' + nf(l.qtd) + ' un)</span></td><td>' + brl(l.custo) + '</td><td class="text-right whitespace-nowrap"><button class="btn btn-out btn-sm" onclick="A.loteModal(\'' + l.id + '\')">✏️ Ajustar</button> <button class="btn btn-red btn-sm" onclick="A.baixaLote(\'' + l.id + '\')">Dar baixa</button></td></tr>';
+          return '<tr><td class="font-mono font-bold">' + esc(l.lote) + (i === 0 && st.k !== 'vencido' ? ' <span class="badge bg-amber-100 text-amber-800 border-amber-300">sai 1º</span>' : '') + '</td><td>' + fmtDia(l.validade) + ' ' + badge(st.label, st.cls) + '</td><td>' + esc(l.deposito) + (l.posicao ? ' · ' + esc(l.posicao) : '') + '</td><td class="font-bold">' + fmtQtd(l.qtd, p.unPorCx) + ' <span class="text-stone-400 font-normal">(' + nf(l.qtd) + ' un)</span></td>' + (ehVendedor() ? '' : ('<td>' + brl(l.custo) + '</td>')) + '<td class="text-right whitespace-nowrap"><button class="btn btn-out btn-sm" onclick="A.loteModal(\'' + l.id + '\')">✏️ Ajustar</button> <button class="btn btn-red btn-sm" onclick="A.baixaLote(\'' + l.id + '\')">Dar baixa</button></td></tr>';
         }).join('') + '</tbody></table>' : '<p class="text-sm text-stone-500">Sem lotes em estoque. <button class="underline font-bold text-amber-700 cursor-pointer" onclick="A.entradaPara(\'' + p.id + '\')">Dar entrada</button></p>') + '</div></td></tr>';
       }
     });
@@ -625,6 +640,11 @@
   A.entradaPara = function (id) { A.tab('entrada'); var p = P(id); if (p) { $('en-prod').value = rotuloProd(p); entradaSelecionar(); setTimeout(function () { $('en-cx').focus(); }, 50); } };
   A.saidaPara = function (id) { A.tab('saida'); var p = P(id); if (p) { $('sd-prod').value = rotuloProd(p); saidaSelecionar(); setTimeout(function () { $('sd-un').focus(); $('sd-un').select(); }, 50); } };
   A.exportarEstoque = function () {
+    if (ehVendedor()) {
+      var lv = [['Produto', 'Marca', 'Categoria', 'Volume', 'Embalagem', 'Un/Emb', 'EAN', 'Lote', 'Validade', 'Depósito', 'Posição', 'Qtd (un)', 'Caixas', 'Preço un', 'Fornecedor']];
+      S.lotes.forEach(function (x) { var p = P(x.produtoId); if (!p) return; lv.push([p.nome, p.marca, p.categoria, p.volume, p.tipoEmb, p.unPorCx, p.ean, x.lote, fmtDia(x.validade), x.deposito, x.posicao, x.qtd, (x.qtd / p.unPorCx).toFixed(2).replace('.', ','), String(p.preco).replace('.', ','), x.fornecedor || p.fornecedor]); });
+      return csv('estoque-' + diaLocal() + '.csv', lv);
+    }
     var l = [['Produto', 'Marca', 'Categoria', 'Volume', 'Embalagem', 'Un/Emb', 'EAN', 'Lote', 'Validade', 'Depósito', 'Posição', 'Qtd (un)', 'Caixas', 'Custo un', 'Preço un', 'Fornecedor']];
     S.lotes.forEach(function (x) { var p = P(x.produtoId); if (!p) return; l.push([p.nome, p.marca, p.categoria, p.volume, p.tipoEmb, p.unPorCx, p.ean, x.lote, fmtDia(x.validade), x.deposito, x.posicao, x.qtd, (x.qtd / p.unPorCx).toFixed(2).replace('.', ','), String(x.custo).replace('.', ','), String(p.preco).replace('.', ','), x.fornecedor || p.fornecedor]); });
     csv('estoque-' + diaLocal() + '.csv', l);
@@ -702,6 +722,7 @@
     }
   }
   A.precoModal = function (id) {
+    if (ehVendedor()) return toast('Acesso negado: vendedores não podem editar preços.', 'erro');
     var p = P(id); if (!p) return;
     var pc = p.unPorCx || 1;
     formModal({
@@ -727,6 +748,7 @@
   };
 
   A.tabelaPrecosModal = function () {
+    if (ehVendedor()) return toast('Acesso negado: vendedores não podem editar preços.', 'erro');
     var catFiltro = '';
     var qFiltro = '';
     var editados = {};
@@ -1142,7 +1164,7 @@
         '<div class="text-[10px] text-stone-500">' + esc(p.marca) + ' ' + esc(p.volume) + ' · disp: <b>' + fmtQtd(e.validos, p.unPorCx) + '</b></div></div>' +
         '<div class="flex items-center gap-1 pt-1"><button type="button" onclick="A.sdQuick(\'' + p.id + '\',1)" class="btn btn-pri btn-sm flex-1">+1 un (' + brl(p.preco) + ')</button>' +
         (p.unPorCx > 1 && e.validos >= p.unPorCx ? '<button type="button" onclick="A.sdQuick(\'' + p.id + '\',' + p.unPorCx + ')" class="btn btn-out btn-sm" title="Adicionar ' + esc(p.tipoEmb) + ' c/' + p.unPorCx + '">+1 ' + (/carteira/i.test(p.tipoEmb || '') ? 'carteira' : 'cx') + '</button>' : '') +
-        '<button type="button" onclick="A.precoModal(\'' + p.id + '\')" class="btn btn-out btn-sm" title="Editar preço deste produto">💲</button>' +
+        (ehVendedor() ? '' : ('<button type="button" onclick="A.precoModal(\'' + p.id + '\')" class="btn btn-out btn-sm" title="Editar preço deste produto">💲</button>')) +
         '</div></div>';
     }).join('');
   }
@@ -1217,7 +1239,7 @@
       var p = P(c.produtoId);
       return '<tr><td><div class="font-bold">' + esc(p.nome) + '</div><div class="text-[11px] text-stone-500">' + esc(p.marca) + ' ' + esc(p.volume) + ' · ' + brl(p.preco) + '/un</div></td>' +
         '<td><div class="flex items-center gap-1.5"><button type="button" class="btn btn-out btn-sm" onclick="A.cartQtd(' + i + ',-1)">−</button><span class="font-bold whitespace-nowrap">' + fmtQtd(c.qtd, p.unPorCx) + '</span><button type="button" class="btn btn-out btn-sm" onclick="A.cartQtd(' + i + ',1)">+</button></div></td>' +
-        (venda ? '<td><input type="number" step="0.01" min="0" value="' + c.subtotal.toFixed(2) + '" class="inp !w-28" onchange="A.cartPreco(' + i + ',this.value)"></td>' : '') + '<td class="text-right"><button class="btn btn-red btn-sm" onclick="A.cartDel(' + i + ')">✕</button></td></tr>';
+        (venda ? '<td>' + (ehVendedor() ? ('<span class="font-bold">' + brl(c.subtotal) + '</span>') : ('<input type="number" step="0.01" min="0" value="' + c.subtotal.toFixed(2) + '" class="inp !w-28" onchange="A.cartPreco(' + i + ',this.value)">')) + '</td>' : '') + '<td class="text-right"><button class="btn btn-red btn-sm" onclick="A.cartDel(' + i + ')">✕</button></td></tr>';
     }).join('') + '</tbody></table>';
     A.sdResumo();
   }
@@ -1258,8 +1280,8 @@
       '<div class="flex justify-between text-sm text-stone-300"><span>Subtotal</span><span>' + brl(sub) + '</span></div>' + (desc ? '<div class="flex justify-between text-sm text-stone-300"><span>Desconto (máx 10%)</span><span>- ' + brl(desc) + '</span></div>' : '') +
       '<div class="flex justify-between text-2xl font-extrabold text-amber-400"><span>Total a Pagar</span><span>' + brl(total) + '</span></div>' +
       (pago > 0 ? '<div class="flex justify-between text-sm font-bold ' + (pago >= total ? 'text-emerald-400' : 'text-rose-400') + '"><span>' + (pago >= total ? '💵 Troco a devolver' : 'Faltam') + '</span><span>' + brl(pago >= total ? troco : (total - pago)) + '</span></div>' : '') +
-      '<div class="flex justify-between text-[11px] text-stone-400 pt-1 border-t border-stone-800"><span>Lucro da venda</span><span>' + brl(total - custo) + (total ? ' (' + Math.round((total - custo) / total * 100) + '%)' : '') + '</span></div>' + warn :
-      '<div class="flex justify-between text-sm"><span>' + cart.length + ' item(ns)</span><span>Custo do estoque baixado: <b>' + brl(custo) + '</b></span></div>';
+      (ehVendedor() ? '' : ('<div class="flex justify-between text-[11px] text-stone-400 pt-1 border-t border-stone-800"><span>Lucro da venda</span><span>' + brl(total - custo) + (total ? ' (' + Math.round((total - custo) / total * 100) + '%)' : '') + '</span></div>')) + warn :
+      '<div class="flex justify-between text-sm"><span>' + cart.length + ' item(ns)</span>' + (ehVendedor() ? '<span>Baixa de estoque</span>' : ('<span>Custo do estoque baixado: <b>' + brl(custo) + '</b></span>')) + '</div>';
   };
   A.sdFinalizar = async function () {
     var err = $('sd-err'); if (err) err.classList.add('hidden');
@@ -1326,7 +1348,7 @@
       '<div class="space-y-2">' + v.itens.map(function (it) {
         return '<div class="border border-stone-200 rounded-xl p-3"><div class="flex justify-between gap-2"><div class="font-bold text-sm">' + esc(it.nome) + ' <span class="text-stone-400 font-normal">' + esc(it.volume) + '</span></div><div class="font-extrabold text-sm whitespace-nowrap">' + fmtQtd(it.qtd, it.unPorCx) + (venda ? ' · ' + brl(it.subtotal) : '') + '</div></div>' + it.aloc.map(function (a) { return '<div class="text-[11px] text-stone-600 mt-1">📍 Retirar de: <b>' + esc(a.deposito) + '</b>' + (a.posicao ? ' (' + esc(a.posicao) + ')' : '') + ' · Lote <b class="font-mono">' + esc(a.lote) + '</b> (val ' + fmtDia(a.validade) + ') → <b>' + fmtQtd(a.qtd, it.unPorCx) + '</b></div>'; }).join('') + '</div>';
       }).join('') + '</div>' +
-      (venda ? '<div class="text-right text-sm">' + (v.desconto ? 'Desconto ' + brl(v.desconto) + '<br>' : '') + '<span class="text-xl font-extrabold">' + brl(v.total) + '</span><br><span class="text-xs text-stone-500">' + esc(v.pagamento) + (v.aPrazo ? ' (fiado)' : '') + (v.valorPago > 0 ? ' · Recebido ' + brl(v.valorPago) + ' · <b class="text-emerald-700">Troco ' + brl(v.troco || 0) + '</b>' : '') + ' · lucro ' + brl(v.total - v.custoTotal) + '</span></div>' : '<div class="text-right text-xs text-stone-500">Custo baixado do estoque: ' + brl(v.custoTotal) + '</div>') +
+      (venda ? '<div class="text-right text-sm">' + (v.desconto ? 'Desconto ' + brl(v.desconto) + '<br>' : '') + '<span class="text-xl font-extrabold">' + brl(v.total) + '</span><br><span class="text-xs text-stone-500">' + esc(v.pagamento) + (v.aPrazo ? ' (fiado)' : '') + (v.valorPago > 0 ? ' · Recebido ' + brl(v.valorPago) + ' · <b class="text-emerald-700">Troco ' + brl(v.troco || 0) + '</b>' : '') + (ehVendedor() ? '' : (' · lucro ' + brl(v.total - v.custoTotal))) + '</span></div>' : (ehVendedor() ? '' : ('<div class="text-right text-xs text-stone-500">Custo baixado do estoque: ' + brl(v.custoTotal) + '</div>'))) +
       '<div class="flex flex-wrap justify-end gap-2"><button class="btn btn-dark" data-p>🖨️ Imprimir Cupom</button>' + (v.status !== 'Estornada' ? '<button class="btn btn-red" data-e>↩️ Estornar</button>' : '') + '<button class="btn btn-out" data-x>Fechar</button></div></div>', 'max-w-xl');
     el.querySelectorAll('[data-x]').forEach(function (b) { b.onclick = function () { el.close(); }; });
     el.querySelector('[data-p]').onclick = function () { imprimir(htmlRomaneio(v)); };
@@ -1411,7 +1433,7 @@
           '<div class="text-[10px] text-stone-500">' + esc(p.marca) + ' ' + esc(p.volume) + (naMesa ? ' · <b class="text-amber-700">na mesa: ' + naMesa + '</b>' : '') + '</div></div>' +
           '<div class="flex items-center gap-1 pt-1"><button type="button" onclick="A.addItemMesa(\'' + m.id + '\',\'' + p.id + '\',1)" class="btn btn-pri btn-sm flex-1">+1 (' + brl(p.preco) + ')</button>' +
           (p.unPorCx > 1 && e.validos >= p.unPorCx ? '<button type="button" onclick="A.addItemMesa(\'' + m.id + '\',\'' + p.id + '\',' + p.unPorCx + ')" class="btn btn-out btn-sm" title="Adicionar ' + esc(p.tipoEmb) + ' c/' + p.unPorCx + '">+1 ' + (/carteira/i.test(p.tipoEmb || '') ? 'carteira' : 'cx') + '</button>' : '') +
-          '<button type="button" onclick="A.precoModal(\'' + p.id + '\')" class="btn btn-out btn-sm" title="Editar preço deste produto">💲</button>' +
+          (ehVendedor() ? '' : ('<button type="button" onclick="A.precoModal(\'' + p.id + '\')" class="btn btn-out btn-sm" title="Editar preço deste produto">💲</button>')) +
           '</div></div>';
       }).join('') : '<div class="col-span-full text-xs text-stone-400 py-4 text-center">Nenhum produto disponível nesta categoria.</div>') +
       '</div></div>' +
@@ -1725,7 +1747,7 @@
       var ls = S.lotes.filter(function (l) { return l.deposito === d.nome; }), u = ls.reduce(function (s, l) { return s + l.qtd; }, 0), pct = u / d.cap * 100;
       var val = ls.reduce(function (s, l) { return s + l.qtd * (l.custo || 0); }, 0);
       var sel = d.nome === F.depSel;
-      return '<div class="card p-4 cursor-pointer ' + (sel ? 'ring-2 ring-amber-500' : '') + '" onclick="A.depositoSel(\'' + esc(d.nome) + '\')"><div class="flex justify-between"><div class="text-3xl">' + d.icon + '</div>' + badge('🌡️ ' + esc(d.temp), 'bg-sky-50 text-sky-800 border-sky-200') + '</div><div class="font-extrabold mt-1">' + esc(d.nome) + '</div><div class="text-xs text-stone-500 mb-2">' + ls.length + ' lote(s) · ' + brl(val) + ' em estoque</div>' + barra(pct, pct > 90 ? 'bg-rose-500' : (pct > 70 ? 'bg-amber-500' : 'bg-emerald-500')) + '<div class="text-[11px] text-stone-500 mt-1">' + Math.round(pct) + '% · ' + nf(u) + ' de ' + nf(d.cap) + ' un</div></div>';
+      return '<div class="card p-4 cursor-pointer ' + (sel ? 'ring-2 ring-amber-500' : '') + '" onclick="A.depositoSel(\'' + esc(d.nome) + '\')"><div class="flex justify-between"><div class="text-3xl">' + d.icon + '</div>' + badge('🌡️ ' + esc(d.temp), 'bg-sky-50 text-sky-800 border-sky-200') + '</div><div class="font-extrabold mt-1">' + esc(d.nome) + '</div><div class="text-xs text-stone-500 mb-2">' + ls.length + ' lote(s)' + (ehVendedor() ? '' : (' · ' + brl(val) + ' em estoque')) + '</div>' + barra(pct, pct > 90 ? 'bg-rose-500' : (pct > 70 ? 'bg-amber-500' : 'bg-emerald-500')) + '<div class="text-[11px] text-stone-500 mt-1">' + Math.round(pct) + '% · ' + nf(u) + ' de ' + nf(d.cap) + ' un</div></div>';
     }).join('');
     var ls = S.lotes.filter(function (l) { return l.deposito === F.depSel; }).sort(function (a, b) { return (a.posicao || '').localeCompare(b.posicao || '') || a.validade.localeCompare(b.validade); });
     $('dep-det').innerHTML = '<div class="px-4 pt-4 font-extrabold">Conteúdo: ' + esc(F.depSel) + '</div>' + (ls.length ? '<table class="w-full"><thead><tr><th>Posição</th><th>Produto</th><th>Lote</th><th>Validade</th><th>Quantidade</th></tr></thead><tbody>' + ls.map(function (l) {
@@ -1764,19 +1786,22 @@
     fill($('his-cli'), [{ v: '', t: 'Todos' }].concat(S.clientes.map(function (c) { return { v: c.id, t: c.nome }; }))); $('his-cli').value = F.hisCliente;
     if (v) {
       var l = hisVendas(), tot = l.filter(function (x) { return x.tipo === 'Venda' && x.status !== 'Estornada'; }).reduce(function (s, x) { return s + x.total; }, 0);
-      $('his-list').innerHTML = !l.length ? '<div class="p-8 text-center text-stone-500 text-sm">Nenhum pedido encontrado.</div>' : '<div class="px-4 pt-3 text-xs text-stone-500">' + l.length + ' registro(s) · vendas válidas: <b>' + brl(tot) + '</b></div><table class="w-full"><thead><tr><th>Nº</th><th>Data</th><th>Cliente</th><th>Tipo</th><th>Itens</th><th>Total</th><th>Pagamento</th><th></th></tr></thead><tbody>' + l.slice(0, 300).map(function (x) {
+      $('his-list').innerHTML = !l.length ? '<div class="p-8 text-center text-stone-500 text-sm">Nenhum pedido encontrado.</div>' : '<div class="px-4 pt-3 text-xs text-stone-500">' + l.length + ' registro(s)' + (ehVendedor() ? '' : (' · vendas válidas: <b>' + brl(tot) + '</b>')) + '</div><table class="w-full"><thead><tr><th>Nº</th><th>Data</th><th>Cliente</th><th>Tipo</th><th>Itens</th>' + (ehVendedor() ? '' : '<th>Total</th>') + '<th>Pagamento</th><th></th></tr></thead><tbody>' + l.slice(0, 300).map(function (x) {
         var est = x.status === 'Estornada';
-        return '<tr class="cursor-pointer hover:bg-amber-50/40 ' + (est ? 'opacity-60' : '') + '" onclick="A.verVenda(\'' + x.id + '\')"><td class="font-bold">#' + x.numero + '</td><td class="text-xs">' + fmtData(x.data) + '</td><td>' + esc(x.clienteNome) + '</td><td>' + badge(esc(x.tipo), x.tipo === 'Venda' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-stone-100 text-stone-700 border-stone-300') + (est ? ' ' + badge('ESTORNADO', 'bg-rose-100 text-rose-800 border-rose-300') : '') + '</td><td class="text-xs text-stone-500">' + x.itens.length + ' item(ns)</td><td class="font-extrabold ' + (est ? 'line-through' : '') + '">' + (x.tipo === 'Venda' ? brl(x.total) : '—') + '</td><td class="text-xs">' + esc(x.pagamento) + (x.aPrazo ? ' ⏳' : '') + '</td><td class="text-right"><button class="btn btn-out btn-sm">Ver</button></td></tr>';
+        return '<tr class="cursor-pointer hover:bg-amber-50/40 ' + (est ? 'opacity-60' : '') + '" onclick="A.verVenda(\'' + x.id + '\')"><td class="font-bold">#' + x.numero + '</td><td class="text-xs">' + fmtData(x.data) + '</td><td>' + esc(x.clienteNome) + '</td><td>' + badge(esc(x.tipo), x.tipo === 'Venda' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-stone-100 text-stone-700 border-stone-300') + (est ? ' ' + badge('ESTORNADO', 'bg-rose-100 text-rose-800 border-rose-300') : '') + '</td><td class="text-xs text-stone-500">' + x.itens.length + ' item(ns)</td>' + (ehVendedor() ? '' : ('<td class="font-extrabold ' + (est ? 'line-through' : '') + '">' + (x.tipo === 'Venda' ? brl(x.total) : '—') + '</td>')) + '<td class="text-xs">' + esc(x.pagamento) + (x.aPrazo ? ' ⏳' : '') + '</td><td class="text-right"><button class="btn btn-out btn-sm">Ver</button></td></tr>';
       }).join('') + '</tbody></table>';
     } else {
       var m = hisMov();
       $('his-list').innerHTML = !m.length ? '<div class="p-8 text-center text-stone-500 text-sm">Nenhuma movimentação.</div>' : '<table class="w-full"><thead><tr><th>Data</th><th>Tipo</th><th>Produto</th><th>Lote</th><th>Qtd</th><th>Detalhe</th><th>Responsável</th></tr></thead><tbody>' + m.slice(0, 400).map(function (h) {
         var ent = /^Entrada|Estorno/.test(h.tipo), sai = /^Sa[ií]da/.test(h.tipo);
-        return '<tr><td class="text-xs whitespace-nowrap">' + fmtData(h.data) + '</td><td>' + badge(esc(h.tipo), ent ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : (sai ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-stone-100 text-stone-700 border-stone-300')) + '</td><td class="font-semibold">' + esc(h.produto) + '</td><td class="font-mono text-xs">' + esc(h.lote) + '</td><td class="font-bold whitespace-nowrap">' + (h.qtd ? (ent ? '+' : (sai ? '−' : '')) + fmtQtd(h.qtd, h.unPorCx) : '—') + '</td><td class="text-xs text-stone-600">' + esc(h.motivo) + (h.valor ? ' · ' + brl(h.valor) : '') + '</td><td class="text-xs text-stone-500">' + esc(h.responsavel) + '</td></tr>';
+        return '<tr><td class="text-xs whitespace-nowrap">' + fmtData(h.data) + '</td><td>' + badge(esc(h.tipo), ent ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : (sai ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-stone-100 text-stone-700 border-stone-300')) + '</td><td class="font-semibold">' + esc(h.produto) + '</td><td class="font-mono text-xs">' + esc(h.lote) + '</td><td class="font-bold whitespace-nowrap">' + (h.qtd ? (ent ? '+' : (sai ? '−' : '')) + fmtQtd(h.qtd, h.unPorCx) : '—') + '</td><td class="text-xs text-stone-600">' + esc(h.motivo) + (!ehVendedor() && h.valor ? ' · ' + brl(h.valor) : '') + '</td><td class="text-xs text-stone-500">' + esc(h.responsavel) + '</td></tr>';
       }).join('') + '</tbody></table>';
     }
   };
   A.hisCsv = function () {
+    if (ehVendedor()) {
+      return toast('Exportação financeira restrita ao Dono/CEO ou Gerente de Negócios.', 'aviso');
+    }
     if (F.hisAba === 'vendas') {
       var l = [['Nº', 'Data', 'Cliente', 'Tipo', 'Status', 'Itens', 'Subtotal', 'Desconto', 'Total', 'Custo', 'Lucro', 'Pagamento']];
       hisVendas().forEach(function (v) { l.push([v.numero, fmtData(v.data), v.clienteNome, v.tipo, v.status, v.itens.map(function (i) { return i.nome + ' x' + i.qtd; }).join(' | '), String(v.subtotal).replace('.', ','), String(v.desconto).replace('.', ','), String(v.total).replace('.', ','), String(v.custoTotal).replace('.', ','), String(Math.round((v.total - v.custoTotal) * 100) / 100).replace('.', ','), v.pagamento]); });
