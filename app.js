@@ -571,7 +571,7 @@
     // últimas vendas
     var ult = S.vendas.slice(0, 6);
     var ultH = '<div class="card p-5"><div class="flex items-center justify-between mb-3"><h3 class="font-extrabold text-stone-900">Últimos pedidos</h3><button class="btn btn-out btn-sm" onclick="A.tab(\'historico\')">Ver todos</button></div>' + (ult.length ? ult.map(function (v) {
-      return '<div class="flex items-center justify-between py-2 border-b border-stone-100 last:border-0 cursor-pointer" onclick="A.verVenda(\'' + v.id + '\')"><div><div class="text-sm font-bold">#' + v.numero + ' · ' + esc(v.clienteNome) + '</div><div class="text-[11px] text-stone-500">' + fmtData(v.data) + ' · ' + esc(v.tipo) + (v.status === 'Estornada' ? ' · ESTORNADO' : '') + '</div></div><div class="text-sm font-extrabold ' + (v.status === 'Estornada' ? 'line-through text-stone-400' : '') + '">' + (ehVendedor() ? '—' : (v.tipo === 'Venda' ? brl(v.total) : '—')) + '</div></div>';
+      return '<div class="flex items-center justify-between py-2 border-b border-stone-100 last:border-0 cursor-pointer" onclick="A.verVenda(\'' + v.id + '\')"><div><div class="text-sm font-bold">#' + v.numero + ' · ' + esc(v.clienteNome) + '</div><div class="text-[11px] text-stone-500">' + fmtData(v.data) + ' · ' + esc(v.tipo) + (v.operador ? ' · 👤 ' + esc(v.operador) : '') + (v.status === 'Estornada' ? ' · ESTORNADO' : '') + '</div></div><div class="text-sm font-extrabold ' + (v.status === 'Estornada' ? 'line-through text-stone-400' : '') + '">' + (ehVendedor() ? '—' : (v.tipo === 'Venda' ? brl(v.total) : '—')) + '</div></div>';
     }).join('') : '<p class="text-sm text-stone-400">Nenhum pedido ainda.</p>') + '</div>';
 
     root.innerHTML = cards + '<div class="grid lg:grid-cols-3 gap-4"><div class="lg:col-span-2 space-y-4">' + graf + alH + '</div><div class="space-y-4">' + topH + ultH + '</div></div><div class="grid md:grid-cols-2 gap-4">' + catH + depH + '</div>';
@@ -629,7 +629,7 @@
       if (expandido[p.id]) {
         h += '<tr><td colspan="6" class="!p-0 bg-stone-50"><div class="px-4 py-3">' + (e.lotes.length ? '<table class="w-full bg-white rounded-xl overflow-hidden border border-stone-200"><thead><tr><th>Lote</th><th>Validade</th><th>Local</th><th>Quantidade</th>' + (ehVendedor() ? '' : '<th>Custo un</th>') + '<th class="text-right">Ações</th></tr></thead><tbody>' + e.lotes.map(function (l, i) {
           var st = statusVal(l.validade);
-          return '<tr><td class="font-mono font-bold">' + esc(l.lote) + (i === 0 && st.k !== 'vencido' ? ' <span class="badge bg-amber-100 text-amber-800 border-amber-300">sai 1º</span>' : '') + '</td><td>' + fmtDia(l.validade) + ' ' + badge(st.label, st.cls) + '</td><td>' + esc(l.deposito) + (l.posicao ? ' · ' + esc(l.posicao) : '') + '</td><td class="font-bold">' + fmtQtd(l.qtd, p.unPorCx) + ' <span class="text-stone-400 font-normal">(' + nf(l.qtd) + ' un)</span></td>' + (ehVendedor() ? '' : ('<td>' + brl(l.custo) + '</td>')) + '<td class="text-right whitespace-nowrap"><button class="btn btn-out btn-sm" onclick="A.loteModal(\'' + l.id + '\')">✏️ Ajustar</button> <button class="btn btn-red btn-sm" onclick="A.baixaLote(\'' + l.id + '\')">Dar baixa</button></td></tr>';
+          return '<tr><td class="font-mono font-bold">' + esc(l.lote) + (i === 0 && st.k !== 'vencido' ? ' <span class="badge bg-amber-100 text-amber-800 border-amber-300">sai 1º</span>' : '') + '</td><td>' + fmtDia(l.validade) + ' ' + badge(st.label, st.cls) + '</td><td>' + esc(l.deposito) + (l.posicao ? ' · ' + esc(l.posicao) : '') + '</td><td class="font-bold">' + fmtQtd(l.qtd, p.unPorCx) + ' <span class="text-stone-400 font-normal">(' + nf(l.qtd) + ' un)</span></td>' + (ehVendedor() ? '' : ('<td>' + brl(l.custo) + '</td>')) + '<td class="text-right whitespace-nowrap"><button class="btn btn-green btn-sm" onclick="A.moverLoteModal(\'' + l.id + '\')" title="Transferir para outro freezer, geladeira ou depósito">🔄 Mover</button> <button class="btn btn-out btn-sm" onclick="A.loteModal(\'' + l.id + '\')">✏️ Ajustar</button> <button class="btn btn-red btn-sm" onclick="A.baixaLote(\'' + l.id + '\')">Dar baixa</button></td></tr>';
         }).join('') + '</tbody></table>' : '<p class="text-sm text-stone-500">Sem lotes em estoque. <button class="underline font-bold text-amber-700 cursor-pointer" onclick="A.entradaPara(\'' + p.id + '\')">Dar entrada</button></p>') + '</div></td></tr>';
       }
     });
@@ -1750,10 +1750,37 @@
       return '<div class="card p-4 cursor-pointer ' + (sel ? 'ring-2 ring-amber-500' : '') + '" onclick="A.depositoSel(\'' + esc(d.nome) + '\')"><div class="flex justify-between"><div class="text-3xl">' + d.icon + '</div>' + badge('🌡️ ' + esc(d.temp), 'bg-sky-50 text-sky-800 border-sky-200') + '</div><div class="font-extrabold mt-1">' + esc(d.nome) + '</div><div class="text-xs text-stone-500 mb-2">' + ls.length + ' lote(s)' + (ehVendedor() ? '' : (' · ' + brl(val) + ' em estoque')) + '</div>' + barra(pct, pct > 90 ? 'bg-rose-500' : (pct > 70 ? 'bg-amber-500' : 'bg-emerald-500')) + '<div class="text-[11px] text-stone-500 mt-1">' + Math.round(pct) + '% · ' + nf(u) + ' de ' + nf(d.cap) + ' un</div></div>';
     }).join('');
     var ls = S.lotes.filter(function (l) { return l.deposito === F.depSel; }).sort(function (a, b) { return (a.posicao || '').localeCompare(b.posicao || '') || a.validade.localeCompare(b.validade); });
-    $('dep-det').innerHTML = '<div class="px-4 pt-4 font-extrabold">Conteúdo: ' + esc(F.depSel) + '</div>' + (ls.length ? '<table class="w-full"><thead><tr><th>Posição</th><th>Produto</th><th>Lote</th><th>Validade</th><th>Quantidade</th></tr></thead><tbody>' + ls.map(function (l) {
+    $('dep-det').innerHTML = '<div class="px-4 pt-4 font-extrabold">Conteúdo: ' + esc(F.depSel) + '</div>' + (ls.length ? '<table class="w-full"><thead><tr><th>Posição</th><th>Produto</th><th>Lote</th><th>Validade</th><th>Quantidade</th><th class="text-right">Ações</th></tr></thead><tbody>' + ls.map(function (l) {
       var p = P(l.produtoId), st = statusVal(l.validade); if (!p) return '';
-      return '<tr><td class="font-semibold">' + esc(l.posicao || '—') + '</td><td>' + (CAT_ICON[p.categoria] || '') + ' ' + esc(p.nome) + '</td><td class="font-mono">' + esc(l.lote) + '</td><td>' + fmtDia(l.validade) + ' ' + badge(st.label, st.cls) + '</td><td class="font-bold">' + fmtQtd(l.qtd, p.unPorCx) + '</td></tr>';
+      return '<tr><td class="font-semibold">' + esc(l.posicao || '—') + '</td><td>' + (CAT_ICON[p.categoria] || '') + ' ' + esc(p.nome) + '</td><td class="font-mono">' + esc(l.lote) + '</td><td>' + fmtDia(l.validade) + ' ' + badge(st.label, st.cls) + '</td><td class="font-bold">' + fmtQtd(l.qtd, p.unPorCx) + '</td><td class="text-right whitespace-nowrap"><button type="button" class="btn btn-green btn-sm" onclick="A.moverLoteModal(\'' + l.id + '\')">🔄 Mover</button></td></tr>';
     }).join('') + '</tbody></table>' : '<div class="p-6 text-sm text-stone-400">Depósito vazio.</div>');
+  };
+
+  A.moverLoteModal = function (id) {
+    var l = S.lotes.filter(function (x) { return x.id === id; })[0]; if (!l) return;
+    var p = P(l.produtoId); if (!p) return;
+    var pc = p.unPorCx || 1;
+    var outrosLocais = S.depositos.filter(function (d) { return d.nome !== l.deposito; }).map(function (d) { return d.icon + ' ' + d.nome; });
+    formModal({
+      title: '🔄 Reposicionar / Mover Estoque',
+      subtitle: '<b>' + esc(p.nome) + '</b> · Lote <span class="font-mono">' + esc(l.lote) + '</span><br>Local atual: <b>' + esc(l.deposito) + '</b> · Disponível: <b>' + fmtQtd(l.qtd, pc) + '</b> (' + nf(l.qtd) + ' un)',
+      submit: '🔄 Confirmar Transferência',
+      fields: [
+        { name: 'deposito', label: 'Mover para (Freezer / Geladeira / Câmara Fria / Gôndola)', type: 'select', options: S.depositos.map(function (d) { return { v: d.nome, t: d.icon + ' ' + d.nome + ' (' + d.temp + ')' }; }), value: (S.depositos.filter(function (d) { return d.nome !== l.deposito; })[0] || S.depositos[0]).nome, span2: true, required: true },
+        { name: 'cx', label: pc > 1 ? ('Caixas / Emb. (c/' + pc + ')') : 'Quantidade (0 = usar campo ao lado)', type: 'number', min: 0, value: pc > 1 ? Math.floor(l.qtd / pc) : 0 },
+        { name: 'un', label: pc > 1 ? 'Unidades soltas' : 'Quantidade de unidades', type: 'number', min: 0, value: pc > 1 ? (l.qtd % pc) : l.qtd },
+        { name: 'posicao', label: 'Posição / Prateleira no destino (opcional)', value: l.posicao || '', placeholder: 'Ex: Prateleira 2, Porta 1', span2: true }
+      ],
+      onChange: function (f, info) {
+        var q = Math.round(toNum(f.cx)) * pc + Math.round(toNum(f.un));
+        info('Movendo <b>' + fmtQtd(q, pc) + '</b> (' + nf(q) + ' un) para <b>' + esc(f.deposito) + '</b>');
+      },
+      onSubmit: async function (f) {
+        var q = Math.round(toNum(f.cx)) * pc + Math.round(toNum(f.un));
+        if (q <= 0 || q > l.qtd) throw new Error('Informe uma quantidade válida (entre 1 e ' + l.qtd + ' un)');
+        await salvar('/api/lote/mover', { id: l.id, deposito: f.deposito, qtd: q, posicao: f.posicao }, 'Movido ' + fmtQtd(q, pc) + ' para ' + f.deposito + '!');
+      }
+    });
   };
 
   // ============================================================ HISTÓRICO

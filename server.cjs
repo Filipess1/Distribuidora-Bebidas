@@ -792,6 +792,62 @@ R_POST('/api/lote/excluir', (db, b) => {
   hist(db, { tipo: 'Exclusão', produtoId: l.produtoId, produto: prod ? prod.nome : '?', lote: l.lote, qtd: l.qtd, unPorCx: prod ? prod.unPorCx : 1, motivo: 'Lote excluído' + (b.motivo ? ' - ' + str(b.motivo, 100) : '') });
   return { success: true };
 });
+R_POST('/api/lote/mover', (db, b) => {
+  const l = db.lotes.find(x => x.id === b.id);
+  if (!l) throw new Error('Lote não encontrado');
+  const destino = DEPOSITOS.find(d => d.nome === b.deposito);
+  if (!destino) throw new Error('Selecione o local de destino');
+  const qtd = b.qtd !== undefined ? int(b.qtd) : l.qtd;
+  if (qtd <= 0 || qtd > l.qtd) throw new Error('Quantidade inválida para movimentar (disponível: ' + l.qtd + ' un)');
+  const novaPos = b.posicao !== undefined ? str(b.posicao, 40) : (l.posicao || '');
+  if (destino.nome === l.deposito && novaPos === (l.posicao || '')) {
+    throw new Error('Escolha um local ou posição diferente da atual');
+  }
+  const prod = db.produtos.find(p => p.id === l.produtoId);
+  const origemNome = l.deposito;
+  if (qtd === l.qtd && destino.nome !== l.deposito) {
+    const jaExiste = db.lotes.find(x => x.id !== l.id && x.produtoId === l.produtoId && x.lote === l.lote && x.validade === l.validade && x.deposito === destino.nome && (x.posicao || '') === novaPos);
+    if (jaExiste) {
+      jaExiste.qtd += qtd;
+      db.lotes = db.lotes.filter(x => x.id !== l.id);
+    } else {
+      l.deposito = destino.nome;
+      l.posicao = novaPos;
+    }
+  } else if (qtd === l.qtd) {
+    l.posicao = novaPos;
+  } else {
+    l.qtd -= qtd;
+    const jaExiste = db.lotes.find(x => x.produtoId === l.produtoId && x.lote === l.lote && x.validade === l.validade && x.deposito === destino.nome && (x.posicao || '') === novaPos);
+    if (jaExiste) {
+      jaExiste.qtd += qtd;
+    } else {
+      db.lotes.push({
+        id: uid(),
+        produtoId: l.produtoId,
+        lote: l.lote,
+        fabricacao: l.fabricacao || '',
+        validade: l.validade,
+        qtd: qtd,
+        deposito: destino.nome,
+        posicao: novaPos,
+        custo: l.custo || (prod ? prod.custo : 0) || 0,
+        fornecedor: l.fornecedor || '',
+        entrada: l.entrada || new Date().toISOString()
+      });
+    }
+  }
+  hist(db, {
+    tipo: 'Transferência',
+    produtoId: l.produtoId,
+    produto: prod ? prod.nome : '?',
+    lote: l.lote,
+    qtd: qtd,
+    unPorCx: prod ? prod.unPorCx : 1,
+    motivo: origemNome + ' → ' + destino.nome + (novaPos ? ' (' + novaPos + ')' : '')
+  });
+  return { success: true };
+});
 
 R_POST('/api/saida', (db, b) => ({ success: true, venda: registrarSaida(db, b) }));
 R_POST('/api/venda/estornar', (db, b) => ({ success: true, venda: estornarVenda(db, b.id) }));
