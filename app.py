@@ -503,11 +503,23 @@ bridge_script = f"""
 
   getLocalIp = function() {{ return 'supabase-cloud'; }};
 
+  function garantirCatalogoAtualizado() {{
+    if (!cloudDb.produtos.length ||
+        !cloudDb.produtos.some(p => p.categoria === 'Cigarros Picados (Unidade)') ||
+        cloudDb.produtos.some(p => /Picado|Unidade \(avulso\)/i.test(p.nome || '') && p.unPorCx !== 1)) {{
+      try {{
+        completarCatalogoDemo(cloudDb);
+        return true;
+      }} catch (_) {{}}
+    }}
+    return false;
+  }}
+
   if (!cloudDb || typeof cloudDb !== 'object' || !Array.isArray(cloudDb.produtos)) {{
     cloudDb = novoBanco();
   }}
-  if (!cloudDb.produtos.length || !cloudDb.produtos.some(p => p.categoria === 'Cigarros Picados (Unidade)') || cloudDb.produtos.some(p => /Picado|Unidade \(avulso\)/i.test(p.nome || '') && p.unPorCx !== 1)) {{
-    try {{ completarCatalogoDemo(cloudDb); }} catch (_) {{}}
+  if (garantirCatalogoAtualizado()) {{
+    cloudDb.rev = (cloudDb.rev || 0) + 1;
   }}
 
   const originalFetch = window.fetch.bind(window);
@@ -531,6 +543,9 @@ bridge_script = f"""
             config: Object.assign(novoBanco().config, d.config || {{}})
           }});
           if (!Array.isArray(cloudDb.mesas)) cloudDb.mesas = [];
+          if (garantirCatalogoAtualizado()) {{
+            await pushSupabase();
+          }}
         }}
       }}
     }} catch (_) {{}}
