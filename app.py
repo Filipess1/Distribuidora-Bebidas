@@ -199,15 +199,16 @@ def _verificar_pin_acesso(titulo_app: str, icone: str):
                         st.session_state.pop("_logout_pendente", None)
                         st.rerun()
                     else:
-                        time.sleep(1.0)
                         with guard["lock"]:
                             guard["falhas"] += 1
                             tentativas = guard["falhas"]
+                            atraso = min(8.0, float(2 ** (tentativas - 1)))
                             if tentativas >= 5:
-                                guard["bloqueado_ate"] = time.time() + 180.0
+                                guard["bloqueado_ate"] = time.time() + 300.0
                                 guard["falhas"] = 0
+                        time.sleep(atraso)
                         if tentativas >= 5:
-                            st.error("🔒 Limite de 5 tentativas excedido. Acesso bloqueado globalmente por 3 minutos.")
+                            st.error("🔒 Limite de 5 tentativas excedido. Acesso bloqueado globalmente por 5 minutos.")
                         else:
                             st.error(f"PIN incorreto ({tentativas}/5 tentativas).")
     st.stop()

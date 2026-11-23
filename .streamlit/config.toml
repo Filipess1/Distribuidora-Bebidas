@@ -1,0 +1,7 @@
+[server]
+enableCORS = true
+enableXsrfProtection = true
+
+[client]
+showErrorDetails = false
+toolbarMode = "minimal"

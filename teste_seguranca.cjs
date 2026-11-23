@@ -168,9 +168,8 @@ function reqSim(opts) {
     url: '/api/saida',
     body: { tipo: 'Venda', itens: [{ produtoId: prodId, qtd: 2, subtotal: 20 }], desconto: 999999 }
   });
-  assert.strictEqual(rDescontoHack.status, 200);
-  assert.strictEqual(rDescontoHack.j.venda.total, 0, 'Desconto maior que subtotal nunca pode gerar total negativo');
-  ok('Fraude Financeira (Quantidades negativas, Custos negativos, Desconto acima do total)', 'Entradas/saidas negativas bloqueadas (400) e total blindado contra valores negativos');
+  assert.strictEqual(rDescontoHack.status, 400, 'Desconto abusivo acima do permitido deve ser bloqueado com HTTP 400');
+  ok('Fraude Financeira (Quantidades negativas, Custos negativos, Desconto abusivo)', 'Entradas/saidas negativas e descontos abusivos bloqueados com HTTP 400');
 
   // 8. Fraude em Conta Fiado e Vasilhames de Clientes
   const rCli = await reqSim({
