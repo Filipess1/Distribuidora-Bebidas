@@ -30,12 +30,12 @@ const DEPOSITOS = [
   { nome: 'Câmara Fria (Cervejas)', temp: '2–4°C', icon: '🧊', cap: 6000 },
   { nome: 'Freezer de Gelos Saborizados', temp: '-15°C', icon: '❄️', cap: 2000 },
   { nome: 'Câmara Fria', temp: '0–4°C', icon: '🧊', cap: 6000 },
-  { nome: 'Freezer Vertical 01', temp: '-2 a 2°C', icon: '🧊', cap: 800 },
-  { nome: 'Freezer Vertical 02', temp: '-2 a 2°C', icon: '🧊', cap: 800 },
-  { nome: 'Freezer Vertical 03', temp: '-2 a 2°C', icon: '🧊', cap: 800 },
-  { nome: 'Freezer Vertical 04', temp: '-2 a 2°C', icon: '🧊', cap: 800 },
-  { nome: 'Freezer Vertical 05', temp: '-2 a 2°C', icon: '🧊', cap: 800 },
-  { nome: 'Freezer Vertical 06', temp: '-2 a 2°C', icon: '🧊', cap: 800 },
+  { nome: 'Freezer Vertical 01', temp: '-2 a 2°C', icon: '🧊', cap: 200 },
+  { nome: 'Freezer Vertical 02', temp: '-2 a 2°C', icon: '🧊', cap: 200 },
+  { nome: 'Freezer Vertical 03', temp: '-2 a 2°C', icon: '🧊', cap: 200 },
+  { nome: 'Freezer Vertical 04', temp: '-2 a 2°C', icon: '🧊', cap: 200 },
+  { nome: 'Freezer Vertical 05', temp: '-2 a 2°C', icon: '🧊', cap: 200 },
+  { nome: 'Freezer Vertical 06', temp: '-2 a 2°C', icon: '🧊', cap: 200 },
   { nome: 'Freezer Horizontal', temp: '-18°C', icon: '❄️', cap: 1500 },
   { nome: 'Barris de Alambique (Balcão)', temp: 'Ambiente', icon: '🛢️', cap: 500 },
   { nome: 'Galpão Principal', temp: 'Ambiente', icon: '🏭', cap: 12000 },
@@ -76,11 +76,25 @@ function getLocalIp() {
   return fallback || 'localhost';
 }
 
+function getDepositos(db) {
+  if (!Array.isArray(db.depositos) || !db.depositos.length) {
+    db.depositos = DEPOSITOS.map(d => Object.assign({}, d));
+  } else {
+    db.depositos.forEach(d => {
+      if (/^Freezer Vertical 0[1-6]$/i.test(d.nome || '') && d.cap === 800) {
+        d.cap = 200;
+      }
+    });
+  }
+  return db.depositos;
+}
+
 // ---------------------------------------------------------------- banco de dados
 function novoBanco() {
   return {
     rev: 1, seqVenda: 0,
     config: { empresa: 'Distribuidora de Bebidas', operador: 'Responsável Depósito', pin: '' },
+    depositos: DEPOSITOS.map(d => Object.assign({}, d)),
     produtos: [], lotes: [], clientes: [], mesas: [], vendas: [], historico: []
   };
 }
@@ -121,12 +135,13 @@ function hist(db, h) {
 }
 
 // ---------------------------------------------------------------- regras de negócio
-function normProduto(d, atual) {
+function normProduto(d, atual, listaDeps) {
   const base = atual || {};
+  const deps = listaDeps || DEPOSITOS;
   const nome = str(d.nome !== undefined ? d.nome : base.nome, 120);
   if (!nome) throw new Error('Informe o nome do produto');
   const cat = CATEGORIAS.includes(d.categoria) ? d.categoria : (base.categoria || 'Outros');
-  const dep = DEPOSITOS.some(x => x.nome === d.depositoPadrao) ? d.depositoPadrao : (base.depositoPadrao || '');
+  const dep = deps.some(x => x.nome === d.depositoPadrao) ? d.depositoPadrao : (base.depositoPadrao || '');
   return {
     id: base.id || uid(),
     nome,
@@ -155,7 +170,7 @@ function checarEanUnico(db, p) {
   }
 }
 function criarProduto(db, d) {
-  const p = normProduto(d);
+  const p = normProduto(d, null, getDepositos(db));
   checarEanUnico(db, p);
   db.produtos.push(p);
   return p;
@@ -171,7 +186,8 @@ function aplicarEntrada(db, it, ctx) {
   if (qtd <= 0) throw new Error('Informe a quantidade de "' + prod.nome + '"');
   const validade = str(it.validade, 10);
   if (!validDate(validade)) throw new Error('Informe a validade de "' + prod.nome + '"');
-  const deposito = DEPOSITOS.some(d => d.nome === it.deposito) ? it.deposito : (prod.depositoPadrao || DEPOSITOS[1].nome);
+  const deps = getDepositos(db);
+  const deposito = deps.some(d => d.nome === it.deposito) ? it.deposito : (prod.depositoPadrao || deps[1].nome);
   const custoUn = money4(it.custoUn !== undefined ? it.custoUn : prod.custo);
   const codigoLote = str(it.lote, 40) || ('L' + validade.slice(2).replace(/-/g, ''));
   const posicao = str(it.posicao, 40);
@@ -670,7 +686,7 @@ function filtrarDadosPorPerfil(db, role) {
   return {
     rev: db.rev, hoje: hojeStr(), role: r, tunnelUrl, wifiUrl: 'http://' + getLocalIp() + ':' + PORT,
     config: { empresa: db.config.empresa, operador: db.config.operador, pinAtivo: !!db.config.pin },
-    categorias: CATEGORIAS, depositos: DEPOSITOS, tiposSaida: Object.keys(TIPOS_SAIDA),
+    categorias: CATEGORIAS, depositos: getDepositos(db), tiposSaida: Object.keys(TIPOS_SAIDA),
     produtos, lotes, clientes: db.clientes, mesas: db.mesas || [], vendas, historico
   };
 }
@@ -710,7 +726,7 @@ R_POST('/api/produto', (db, b, role) => {
       throw new Error('Acesso negado: apenas Dono/CEO ou Gerente podem cadastrar novos produtos com preço.');
     }
   }
-  const p = normProduto(b, idx >= 0 ? db.produtos[idx] : null);
+  const p = normProduto(b, idx >= 0 ? db.produtos[idx] : null, getDepositos(db));
   checarEanUnico(db, p);
   if (idx >= 0) {
     const mudouEmb = db.produtos[idx].unPorCx !== p.unPorCx;
@@ -777,7 +793,8 @@ R_POST('/api/lote/editar', (db, b) => {
   const dif = qtdNova - l.qtd;
   l.lote = str(b.lote, 40) || l.lote;
   l.validade = validade;
-  l.deposito = DEPOSITOS.some(d => d.nome === b.deposito) ? b.deposito : l.deposito;
+  const deps = getDepositos(db);
+  l.deposito = deps.some(d => d.nome === b.deposito) ? b.deposito : l.deposito;
   l.posicao = b.posicao !== undefined ? str(b.posicao, 40) : l.posicao;
   l.qtd = qtdNova;
   hist(db, { tipo: dif !== 0 ? 'Ajuste de Inventário' : 'Lote (edição)', produtoId: l.produtoId, produto: prod ? prod.nome : '?', lote: l.lote, qtd: Math.abs(dif), unPorCx: prod ? prod.unPorCx : 1, motivo: dif !== 0 ? (dif > 0 ? 'Sobra' : 'Falta') + ' de ' + Math.abs(dif) + ' un' + (b.motivo ? ' - ' + str(b.motivo, 100) : '') : 'Dados do lote atualizados' });
@@ -795,7 +812,8 @@ R_POST('/api/lote/excluir', (db, b) => {
 R_POST('/api/lote/mover', (db, b) => {
   const l = db.lotes.find(x => x.id === b.id);
   if (!l) throw new Error('Lote não encontrado');
-  const destino = DEPOSITOS.find(d => d.nome === b.deposito);
+  const deps = getDepositos(db);
+  const destino = deps.find(d => d.nome === b.deposito);
   if (!destino) throw new Error('Selecione o local de destino');
   const qtd = b.qtd !== undefined ? int(b.qtd) : l.qtd;
   if (qtd <= 0 || qtd > l.qtd) throw new Error('Quantidade inválida para movimentar (disponível: ' + l.qtd + ' un)');
@@ -847,6 +865,38 @@ R_POST('/api/lote/mover', (db, b) => {
     motivo: origemNome + ' → ' + destino.nome + (novaPos ? ' (' + novaPos + ')' : '')
   });
   return { success: true };
+});
+
+R_POST('/api/deposito/editar', (db, b, role) => {
+  exigirGerencia(role, 'Acesso negado: vendedores não podem renomear freezers ou depósitos.');
+  const deps = getDepositos(db);
+  const nomeAntigo = str(b.nomeAntigo, 80);
+  const nomeNovo = str(b.nomeNovo, 80);
+  if (!nomeNovo) throw new Error('Informe o novo nome do equipamento/depósito');
+  const d = deps.find(x => x.nome === nomeAntigo);
+  if (!d) throw new Error('Equipamento/depósito não encontrado');
+  if (nomeNovo !== nomeAntigo && deps.some(x => x.nome.toLowerCase() === nomeNovo.toLowerCase())) {
+    throw new Error('Já existe outro local com o nome "' + nomeNovo + '"');
+  }
+  d.nome = nomeNovo;
+  if (b.temp !== undefined && str(b.temp, 30)) d.temp = str(b.temp, 30);
+  if (b.cap !== undefined) {
+    const capNovo = int(b.cap);
+    if (capNovo > 0) d.cap = capNovo;
+  }
+  if (nomeNovo !== nomeAntigo) {
+    db.lotes.forEach(l => { if (l.deposito === nomeAntigo) l.deposito = nomeNovo; });
+    db.produtos.forEach(p => { if (p.depositoPadrao === nomeAntigo) p.depositoPadrao = nomeNovo; });
+    hist(db, {
+      tipo: 'Depósito (edição)',
+      produto: nomeNovo,
+      lote: '-',
+      qtd: 0,
+      unPorCx: 1,
+      motivo: 'Renomeado de "' + nomeAntigo + '" para "' + nomeNovo + '"'
+    });
+  }
+  return { success: true, deposito: d };
 });
 
 R_POST('/api/saida', (db, b) => ({ success: true, venda: registrarSaida(db, b) }));

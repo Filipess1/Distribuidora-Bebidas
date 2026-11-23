@@ -1769,6 +1769,7 @@
       '<button type="button" data-x class="text-2xl text-stone-400 hover:text-stone-700 cursor-pointer">&times;</button></div>' +
       '<div class="flex flex-wrap gap-2">' +
       '<button type="button" class="btn btn-pri btn-sm" id="dep-m-puxar">📥 Trazer / Reposicionar Produto para Cá</button>' +
+      (ehVendedor() ? '' : '<button type="button" class="btn btn-out btn-sm" id="dep-m-editar">✏️ Editar Nome / Capacidade</button>') +
       '</div>' +
       '<div class="border border-stone-200 rounded-xl overflow-x-auto max-h-80 overflow-y-auto">' +
       (ls.length ? '<table class="w-full"><thead><tr><th>Posição</th><th>Produto</th><th>Lote</th><th>Validade</th><th>Qtd</th><th class="text-right">Ações</th></tr></thead><tbody>' + ls.map(function (l) {
@@ -1781,8 +1782,30 @@
     );
     el.querySelectorAll('[data-x]').forEach(function (b) { b.onclick = function () { el.close(); }; });
     el.querySelector('#dep-m-puxar').onclick = function () { el.close(); A.reposicionarGeralModal(d.nome); };
+    var btnEd = el.querySelector('#dep-m-editar');
+    if (btnEd) btnEd.onclick = function () { el.close(); A.editarDepositoModal(d.nome); };
     el.querySelectorAll('[data-mv]').forEach(function (b) {
       b.onclick = function () { el.close(); A.moverLoteModal(b.getAttribute('data-mv')); };
+    });
+  };
+  A.editarDepositoModal = function (nomeDep) {
+    if (ehVendedor()) return toast('Acesso negado: apenas Dono/CEO ou Gerente podem editar nomes.', 'erro');
+    var d = S.depositos.filter(function (x) { return x.nome === nomeDep; })[0];
+    if (!d) return;
+    formModal({
+      title: '✏️ Editar Freezer / Geladeira / Depósito',
+      subtitle: 'Renomear ou ajustar capacidade de <b>' + esc(d.nome) + '</b> (os produtos dentro são atualizados automaticamente).',
+      submit: '💾 Salvar Alterações',
+      fields: [
+        { name: 'nomeNovo', label: 'Nome do Freezer / Geladeira / Local', value: d.nome, required: true, span2: true, placeholder: 'Ex: Freezer Vertical 01 (Cervejas)' },
+        { name: 'temp', label: 'Temperatura', value: d.temp, required: true, placeholder: 'Ex: -2 a 2°C' },
+        { name: 'cap', label: 'Capacidade (unidades)', type: 'number', min: 1, value: d.cap, required: true }
+      ],
+      onSubmit: async function (f) {
+        await salvar('/api/deposito/editar', { nomeAntigo: d.nome, nomeNovo: f.nomeNovo, temp: f.temp, cap: Math.round(toNum(f.cap)) }, 'Local atualizado para "' + f.nomeNovo + '"!');
+        if (F.depSel === d.nome) F.depSel = f.nomeNovo;
+        RENDER.depositos();
+      }
     });
   };
   RENDER.depositos = function () {
@@ -1794,7 +1817,7 @@
       return '<div class="card p-4 cursor-pointer transition hover:border-amber-400 hover:shadow-md ' + (sel ? 'ring-2 ring-amber-500 bg-amber-50/20' : '') + '" onclick="A.depositoSel(\'' + esc(d.nome) + '\', true)">' +
         '<div class="flex justify-between items-center"><button type="button" onclick="event.stopPropagation();A.depositoSel(\'' + esc(d.nome) + '\', true)" class="w-12 h-12 rounded-2xl bg-sky-50 hover:bg-amber-100 border border-sky-200 flex items-center justify-center text-3xl cursor-pointer transition transform hover:scale-105" title="Abrir ' + esc(d.nome) + '">' + d.icon + '</button>' +
         '<div class="text-right">' + badge('🌡️ ' + esc(d.temp), 'bg-sky-50 text-sky-800 border-sky-200') + '<div class="text-[10px] font-bold text-amber-700 mt-1">👆 Clique para abrir</div></div></div>' +
-        '<div class="font-extrabold mt-2">' + esc(d.nome) + '</div><div class="text-xs text-stone-500 mb-2">' + ls.length + ' lote(s)' + (ehVendedor() ? '' : (' · ' + brl(val) + ' em estoque')) + '</div>' + barra(pct, pct > 90 ? 'bg-rose-500' : (pct > 70 ? 'bg-amber-500' : 'bg-emerald-500')) + '<div class="text-[11px] text-stone-500 mt-1">' + Math.round(pct) + '% · ' + nf(u) + ' de ' + nf(d.cap) + ' un</div></div>';
+        '<div class="flex items-start justify-between gap-2"><div class="font-extrabold mt-2">' + esc(d.nome) + '</div>' + (ehVendedor() ? '' : ('<button type="button" onclick="event.stopPropagation();A.editarDepositoModal(\'' + esc(d.nome) + '\')" class="btn btn-out btn-sm mt-1.5" title="Editar nome deste freezer/local">✏️</button>')) + '</div><div class="text-xs text-stone-500 mb-2">' + ls.length + ' lote(s)' + (ehVendedor() ? '' : (' · ' + brl(val) + ' em estoque')) + '</div>' + barra(pct, pct > 90 ? 'bg-rose-500' : (pct > 70 ? 'bg-amber-500' : 'bg-emerald-500')) + '<div class="text-[11px] text-stone-500 mt-1">' + Math.round(pct) + '% · ' + nf(u) + ' de ' + nf(d.cap) + ' un</div></div>';
     }).join('');
     var ls = S.lotes.filter(function (l) { return l.deposito === F.depSel; }).sort(function (a, b) { return (a.posicao || '').localeCompare(b.posicao || '') || a.validade.localeCompare(b.validade); });
     $('dep-det').innerHTML = '<div class="px-4 pt-4 pb-2 flex flex-wrap items-center justify-between gap-2"><span class="font-extrabold">Conteúdo: ' + esc(F.depSel) + '</span><button type="button" class="btn btn-pri btn-sm" onclick="A.reposicionarGeralModal(\'' + esc(F.depSel) + '\')">📥 Trazer Produto para Cá</button></div>' + (ls.length ? '<table class="w-full"><thead><tr><th>Posição</th><th>Produto</th><th>Lote</th><th>Validade</th><th>Quantidade</th><th class="text-right">Ações</th></tr></thead><tbody>' + ls.map(function (l) {
