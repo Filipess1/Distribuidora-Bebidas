@@ -1,3 +1,5 @@
+import base64
+import datetime
 import hashlib
 import hmac
 import json
@@ -7,6 +9,11 @@ import time
 import streamlit as st
 import streamlit.components.v1 as components
 from sqlalchemy import create_engine, text
+
+try:
+    import extra_streamlit_components as stx
+except ImportError:
+    stx = None
 
 st.set_page_config(
     page_title="Distribuidora de Bebidas — Gestão de Estoque & Vendas",
@@ -68,12 +75,81 @@ PERFIS_ROTULOS = {
 }
 
 
+COOKIE_NOME = "db_sessao_token"
+COOKIE_DIAS = 7
+
+
+def _chave_cookie() -> bytes:
+    db_url = st.secrets.get("DATABASE_URL", os.environ.get("DATABASE_URL", "local"))
+    pin = _obter_pin_esperado()
+    return f"cookie::{APP_KEY}::{db_url}::{pin}".encode("utf-8")
+
+
+def _criar_cookie_sessao(perfil: str, operador: str) -> str:
+    payload = base64.urlsafe_b64encode(
+        json.dumps(
+            {"r": perfil, "o": operador, "exp": int(time.time()) + COOKIE_DIAS * 86400},
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).decode("ascii")
+    sig = hmac.new(_chave_cookie(), payload.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"{payload}.{sig}"
+
+
+def _validar_cookie_sessao(token: str, pins: dict):
+    if not token or "." not in str(token):
+        return None
+    try:
+        payload_b64, sig = str(token).rsplit(".", 1)
+        sig_esperada = hmac.new(_chave_cookie(), payload_b64.encode("ascii"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, sig_esperada):
+            return None
+        dados = json.loads(base64.urlsafe_b64decode(payload_b64.encode("ascii")).decode("utf-8"))
+        if int(dados.get("exp", 0)) < time.time():
+            return None
+        perfil = dados.get("r")
+        if perfil not in pins:
+            return None
+        return perfil, str(dados.get("o") or "")
+    except Exception:
+        return None
+
+
 def _verificar_pin_acesso(titulo_app: str, icone: str):
-    """Bloqueia o acesso no servidor Streamlit antes de carregar dados ou chaves do Supabase."""
+    """Bloqueia o acesso no servidor Streamlit e mantém a sessão em cookie assinado (HMAC) ao atualizar a página."""
     pins = _obter_pins_por_perfil()
 
-    if st.session_state.get("pin_autenticado") and st.session_state.get("nivel_acesso") in pins:
+    cookie_manager = stx.CookieManager(key="db_cookie_manager") if stx else None
+    cookies = (cookie_manager.get_all() or {}) if cookie_manager else {}
+    cookie_token = cookies.get(COOKIE_NOME)
+
+    # Logout em andamento: apaga o cookie antes de mostrar o login
+    if st.session_state.get("_logout_pendente"):
+        if cookie_manager and cookie_token:
+            cookie_manager.delete(COOKIE_NOME, key="del_db_cookie")
+        else:
+            st.session_state.pop("_logout_pendente", None)
+
+    # Já autenticado nesta sessão
+    elif st.session_state.get("pin_autenticado") and st.session_state.get("nivel_acesso") in pins:
+        pendente = st.session_state.pop("_salvar_cookie", None)
+        if pendente and cookie_manager:
+            expira = datetime.datetime.now() + datetime.timedelta(days=COOKIE_DIAS)
+            cookie_manager.set(COOKIE_NOME, pendente, expires_at=expira, key="set_db_cookie")
         return st.session_state["nivel_acesso"], st.session_state.get("operador_nome", "")
+
+    # Restaura sessão automaticamente após F5 / atualizar página
+    elif cookie_token and not st.session_state.get("_cookie_invalido"):
+        restaurado = _validar_cookie_sessao(cookie_token, pins)
+        if restaurado:
+            perfil_rest, op_rest = restaurado
+            st.session_state["pin_autenticado"] = True
+            st.session_state["nivel_acesso"] = perfil_rest
+            st.session_state["operador_nome"] = op_rest
+            return perfil_rest, op_rest
+        st.session_state["_cookie_invalido"] = True
+        if cookie_manager:
+            cookie_manager.delete(COOKIE_NOME, key="del_db_cookie_inv")
 
     guard = _controle_forca_bruta_global()
     with guard["lock"]:
@@ -118,6 +194,9 @@ def _verificar_pin_acesso(titulo_app: str, icone: str):
                         st.session_state["pin_autenticado"] = True
                         st.session_state["nivel_acesso"] = perfil
                         st.session_state["operador_nome"] = nome_limpo
+                        st.session_state["_salvar_cookie"] = _criar_cookie_sessao(perfil, nome_limpo)
+                        st.session_state.pop("_cookie_invalido", None)
+                        st.session_state.pop("_logout_pendente", None)
                         st.rerun()
                     else:
                         time.sleep(1.0)
@@ -352,6 +431,7 @@ with col_sair:
         st.session_state.pop("pin_autenticado", None)
         st.session_state.pop("nivel_acesso", None)
         st.session_state.pop("operador_nome", None)
+        st.session_state["_logout_pendente"] = True
         st.rerun()
 
 token_sincronizacao = _gerar_sync_token()
