@@ -465,7 +465,14 @@
     var rep = calcReposicao().filter(function (x) { return x.nivel !== 'ok'; }).length;
     var venc = S.lotes.filter(function (l) { return diasPara(l.validade) <= 30; }).length;
     var nMesas = (S.mesas || []).length;
-    $('nav').innerHTML = TABS.map(function (t) {
+    if (ehVendedor() && tab === 'clientes') {
+      tab = 'dashboard';
+      localStorage.setItem('db_tab', tab);
+      TABS.forEach(function (t) { $('tab-' + t.id).classList.toggle('hidden', t.id !== tab); });
+    }
+    $('nav').innerHTML = TABS.filter(function (t) {
+      return !(ehVendedor() && t.id === 'clientes');
+    }).map(function (t) {
       var ativo = t.id === tab;
       var b = '';
       if (t.id === 'mesas' && nMesas) b = '<span class="ml-1 px-1.5 rounded-full bg-emerald-600 text-white text-[10px]">' + nMesas + '</span>';
@@ -1237,6 +1244,12 @@
   };
   function renderCart() {
     var box = $('sd-cart'); if (!box) return;
+    if ($('sd-cli-box')) $('sd-cli-box').classList.toggle('hidden', ehVendedor());
+    if ($('sd-pag')) {
+      var optFiado = Array.prototype.filter.call($('sd-pag').options, function (o) { return /fiado|prazo/i.test(o.value); })[0];
+      if (optFiado) optFiado.hidden = ehVendedor();
+      if (ehVendedor() && /fiado|prazo/i.test($('sd-pag').value)) $('sd-pag').value = 'PIX';
+    }
     var venda = tipoSaida() === 'Venda';
     cart = cart.filter(function (c) { return P(c.produtoId); });
     if (!cart.length) box.innerHTML = '<div class="p-8 text-center text-stone-400 text-sm">Carrinho vazio. Clique nos produtos acima, digite o nome ou bipe o código de barras.</div>';
@@ -1249,6 +1262,12 @@
     A.sdResumo();
   }
   A.sdResumo = function () {
+    if ($('sd-cli-box')) $('sd-cli-box').classList.toggle('hidden', ehVendedor());
+    if ($('sd-pag')) {
+      var optFiado = Array.prototype.filter.call($('sd-pag').options, function (o) { return /fiado|prazo/i.test(o.value); })[0];
+      if (optFiado) optFiado.hidden = ehVendedor();
+      if (ehVendedor() && /fiado|prazo/i.test($('sd-pag').value)) $('sd-pag').value = 'PIX';
+    }
     var venda = tipoSaida() === 'Venda';
     $('sd-venda-box').classList.toggle('hidden', !venda);
     var pg = $('sd-pag').value;
@@ -1621,16 +1640,20 @@
     if (!m.itens.length) return toast('Esta mesa não tem produtos consumidos ainda.', 'aviso');
     var total = m.itens.reduce(function (s, i) { return s + (Number(i.subtotal) || 0); }, 0);
     var maxDescMesa = Math.round(total * 0.10 * 100) / 100;
+    var pagamentosMesa = ehVendedor() ? PAGAMENTOS.filter(function (p) { return !/fiado|prazo/i.test(p); }) : PAGAMENTOS;
+    var camposMesa = [
+      { name: 'pagamento', label: 'Forma de Pagamento', type: 'select', options: pagamentosMesa, value: 'PIX' },
+      { name: 'desconto', label: 'Desconto R$ (Máx. 10% = ' + brl(maxDescMesa) + ')', type: 'number', step: '0.01', min: 0, value: '', hint: 'Limite máximo permitido: 10% do valor total' },
+      { name: 'valorPago', label: 'Valor Recebido p/ Troco (R$)', type: 'number', step: '0.01', min: 0, value: '' }
+    ];
+    if (!ehVendedor()) {
+      camposMesa.push({ name: 'clienteId', label: 'Vincular a cliente cadastrado (só p/ fiado)', type: 'select', options: [{ v: '', t: '— Consumidor Final (' + m.pessoa + ') —' }].concat(S.clientes.map(function (c) { return { v: c.id, t: c.nome }; })), value: '' });
+    }
     formModal({
       title: '💵 Fechar Conta — ' + m.mesa + ' (' + m.pessoa + ')',
       subtitle: m.itens.length + ' produto(s) consumido(s) · Total: <b class="text-emerald-700">' + brl(total) + '</b> · Desconto máx (10%): <b>' + brl(maxDescMesa) + '</b>',
       submit: '✅ Confirmar Recebimento & Baixar Estoque',
-      fields: [
-        { name: 'pagamento', label: 'Forma de Pagamento', type: 'select', options: PAGAMENTOS, value: 'PIX' },
-        { name: 'desconto', label: 'Desconto R$ (Máx. 10% = ' + brl(maxDescMesa) + ')', type: 'number', step: '0.01', min: 0, value: '', hint: 'Limite máximo permitido: 10% do valor total' },
-        { name: 'valorPago', label: 'Valor Recebido p/ Troco (R$)', type: 'number', step: '0.01', min: 0, value: '' },
-        { name: 'clienteId', label: 'Vincular a cliente cadastrado (só p/ fiado)', type: 'select', options: [{ v: '', t: '— Consumidor Final (' + m.pessoa + ') —' }].concat(S.clientes.map(function (c) { return { v: c.id, t: c.nome }; })), value: '' }
-      ],
+      fields: camposMesa,
       onChange: function (f, info) {
         var descDig = toNum(f.desconto);
         var desc = Math.min(descDig, maxDescMesa);

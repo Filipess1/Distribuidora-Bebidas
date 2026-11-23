@@ -688,7 +688,7 @@ function filtrarDadosPorPerfil(db, role) {
     rev: db.rev, hoje: hojeStr(), role: r, tunnelUrl, wifiUrl: 'http://' + getLocalIp() + ':' + PORT,
     config: { empresa: db.config.empresa, operador: db.config.operador, pinAtivo: !!db.config.pin },
     categorias: CATEGORIAS, depositos: getDepositos(db), tiposSaida: Object.keys(TIPOS_SAIDA),
-    produtos, lotes, clientes: db.clientes, mesas: db.mesas || [], vendas, historico
+    produtos, lotes, clientes: r === 'vendedor' ? [] : db.clientes, mesas: db.mesas || [], vendas, historico
   };
 }
 
@@ -900,7 +900,12 @@ R_POST('/api/deposito/editar', (db, b, role) => {
   return { success: true, deposito: d };
 });
 
-R_POST('/api/saida', (db, b) => ({ success: true, venda: registrarSaida(db, b) }));
+R_POST('/api/saida', (db, b, role) => {
+  if (role === 'vendedor' && (/prazo|fiado/i.test(String(b.pagamento || '')) || b.clienteId)) {
+    throw new Error('Acesso negado: vendas no fiado são exclusivas do Dono/CEO ou Gerente de Negócios.');
+  }
+  return { success: true, venda: registrarSaida(db, b) };
+});
 R_POST('/api/venda/estornar', (db, b) => ({ success: true, venda: estornarVenda(db, b.id) }));
 
 // ---------------------------------------------------------------- mesas / consumo no local
@@ -1027,7 +1032,8 @@ R_POST('/api/mesa/cancelar', (db, b) => {
   return { success: true };
 });
 
-R_POST('/api/cliente', (db, b) => {
+R_POST('/api/cliente', (db, b, role) => {
+  exigirGerencia(role, 'Acesso negado: clientes e fiado são exclusivos do Dono/CEO ou Gerente de Negócios.');
   const nome = str(b.nome, 100);
   if (!nome) throw new Error('Informe o nome do cliente');
   const campos = { nome, tipo: str(b.tipo, 40), doc: str(b.doc, 20), telefone: str(b.telefone, 30), endereco: str(b.endereco, 160), limite: money(b.limite) };
@@ -1041,7 +1047,8 @@ R_POST('/api/cliente', (db, b) => {
   db.clientes.push(c);
   return { success: true, cliente: c };
 });
-R_POST('/api/cliente/excluir', (db, b) => {
+R_POST('/api/cliente/excluir', (db, b, role) => {
+  exigirGerencia(role, 'Acesso negado: clientes e fiado são exclusivos do Dono/CEO ou Gerente de Negócios.');
   const c = db.clientes.find(x => x.id === b.id);
   if (!c) throw new Error('Cliente não encontrado');
   if ((c.saldo || 0) > 0) throw new Error('Cliente com saldo devedor de R$ ' + c.saldo.toFixed(2) + '. Receba antes de excluir.');
@@ -1049,7 +1056,8 @@ R_POST('/api/cliente/excluir', (db, b) => {
   db.clientes = db.clientes.filter(x => x.id !== c.id);
   return { success: true };
 });
-R_POST('/api/cliente/receber', (db, b) => {
+R_POST('/api/cliente/receber', (db, b, role) => {
+  exigirGerencia(role, 'Acesso negado: clientes e fiado são exclusivos do Dono/CEO ou Gerente de Negócios.');
   const c = db.clientes.find(x => x.id === b.clienteId);
   if (!c) throw new Error('Cliente não encontrado');
   const valor = money(b.valor);
@@ -1059,7 +1067,8 @@ R_POST('/api/cliente/receber', (db, b) => {
   hist(db, { tipo: 'Recebimento', produto: c.nome, lote: '-', qtd: 0, unPorCx: 1, motivo: 'Pagamento recebido (' + str(b.forma || 'Dinheiro', 30) + ')', valor });
   return { success: true, saldo: c.saldo };
 });
-R_POST('/api/cliente/vasilhame', (db, b) => {
+R_POST('/api/cliente/vasilhame', (db, b, role) => {
+  exigirGerencia(role, 'Acesso negado: clientes e fiado são exclusivos do Dono/CEO ou Gerente de Negócios.');
   const c = db.clientes.find(x => x.id === b.clienteId);
   if (!c) throw new Error('Cliente não encontrado');
   const cx = int(b.caixas);
