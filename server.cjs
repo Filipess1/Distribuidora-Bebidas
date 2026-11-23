@@ -568,8 +568,8 @@ function completarCatalogoDemo(db) {
       existente.nome = c[0];
       existente.marca = c[1];
       existente.categoria = c[2];
-      // Cigarro avulso: garante que é vendido por UNIDADE (separado da carteira)
-      if (c[4] === 'Unidade' && /cigarro/i.test(c[0]) && existente.unPorCx !== 1) {
+      // Cigarro avulso: garante que é vendido por UNIDADE (separado da carteira) com preço unitário
+      if (c[4] === 'Unidade' && /cigarro/i.test(c[0]) && (existente.unPorCx !== 1 || existente.preco >= 5)) {
         existente.tipoEmb = 'Unidade';
         existente.unPorCx = 1;
         existente.volume = c[3];

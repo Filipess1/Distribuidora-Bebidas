@@ -1159,11 +1159,14 @@
     if (!prods.length) { box.innerHTML = '<div class="col-span-full text-xs text-stone-400 py-3 text-center">Sem produtos com estoque válido nesta categoria.</div>'; return; }
     box.innerHTML = prods.map(function (p) {
       var e = E[p.id];
+      var ehMaco = /ma[cç]os?/i.test(p.tipoEmb || '');
+      var rotUn = ehMaco ? '+1 maço' : '+1 un';
+      var rotCx = /carteira/i.test(p.tipoEmb || '') ? '+1 carteira' : (ehMaco ? '+1 pct' : '+1 cx');
       return '<div class="border border-stone-200 rounded-xl p-2.5 bg-stone-50/70 hover:bg-amber-50/50 flex flex-col justify-between gap-1.5">' +
         '<div><div class="font-bold text-xs text-stone-900 leading-tight truncate" title="' + esc(p.nome) + '">' + (CAT_ICON[p.categoria] || '') + ' ' + esc(p.nome) + '</div>' +
         '<div class="text-[10px] text-stone-500">' + esc(p.marca) + ' ' + esc(p.volume) + ' · disp: <b>' + fmtQtd(e.validos, p.unPorCx) + '</b></div></div>' +
-        '<div class="flex items-center gap-1 pt-1"><button type="button" onclick="A.sdQuick(\'' + p.id + '\',1)" class="btn btn-pri btn-sm flex-1">+1 un (' + brl(p.preco) + ')</button>' +
-        (p.unPorCx > 1 && e.validos >= p.unPorCx ? '<button type="button" onclick="A.sdQuick(\'' + p.id + '\',' + p.unPorCx + ')" class="btn btn-out btn-sm" title="Adicionar ' + esc(p.tipoEmb) + ' c/' + p.unPorCx + '">+1 ' + (/carteira/i.test(p.tipoEmb || '') ? 'carteira' : 'cx') + '</button>' : '') +
+        '<div class="flex items-center gap-1 pt-1"><button type="button" onclick="A.sdQuick(\'' + p.id + '\',1)" class="btn btn-pri btn-sm flex-1">' + rotUn + ' (' + brl(p.preco) + ')</button>' +
+        (p.unPorCx > 1 && e.validos >= p.unPorCx ? '<button type="button" onclick="A.sdQuick(\'' + p.id + '\',' + p.unPorCx + ')" class="btn btn-out btn-sm" title="Adicionar ' + esc(p.tipoEmb) + ' c/' + p.unPorCx + '">' + rotCx + '</button>' : '') +
         (ehVendedor() ? '' : ('<button type="button" onclick="A.precoModal(\'' + p.id + '\')" class="btn btn-out btn-sm" title="Editar preço deste produto">💲</button>')) +
         '</div></div>';
     }).join('');
