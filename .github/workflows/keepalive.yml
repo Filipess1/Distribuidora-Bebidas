@@ -1,0 +1,20 @@
+name: Keep Streamlit Apps Awake 24/7
+
+on:
+  schedule:
+    - cron: '*/25 * * * *'
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Streamlit Apps & Prevent Hibernation
+        run: |
+          for url in \
+            "https://distribuidora-bebidas.streamlit.app" \
+            "https://deposito-alimentos.streamlit.app" \
+            "https://barbearia-app.streamlit.app"; do
+            echo "Pinging $url ..."
+            curl -s -L -A "Mozilla/5.0 (Streamlit-KeepAlive-24x7)" --max-time 25 "$url" > /dev/null || true
+          done

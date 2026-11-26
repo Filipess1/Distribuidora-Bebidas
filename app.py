@@ -30,6 +30,72 @@ APP_JS_FILE = os.path.join(BASE_DIR, "app.js")
 SERVER_CJS_FILE = os.path.join(BASE_DIR, "server.cjs")
 
 
+def _obter_urls_apps_keepalive() -> list:
+    """Lista de URLs públicas (Streamlit Cloud) e locais para manter acordadas 24/7 sem hibernar."""
+    padrao = [
+        "https://distribuidora-bebidas.streamlit.app",
+        "https://deposito-alimentos.streamlit.app",
+        "https://barbearia-app.streamlit.app",
+        "http://127.0.0.1:8501",
+        "http://127.0.0.1:8502",
+        "http://127.0.0.1:8503",
+    ]
+    extras_raw = str(st.secrets.get("KEEPALIVE_URLS", os.environ.get("KEEPALIVE_URLS", ""))).strip()
+    if extras_raw:
+        for u in extras_raw.split(","):
+            u = u.strip()
+            if u and u not in padrao:
+                padrao.append(u)
+    return padrao
+
+
+@st.cache_resource(show_spinner=False)
+def _iniciar_keepalive_24x7():
+    """Thread daemon no servidor que faz ping periodico nos apps e no Supabase para nunca hibernarem."""
+    import urllib.request
+
+    estado = {"ativo": True, "ultimo_ping": "", "total_pings": 0}
+
+    def _loop():
+        while True:
+            try:
+                for url in _obter_urls_apps_keepalive():
+                    try:
+                        req = urllib.request.Request(
+                            url,
+                            headers={"User-Agent": "Mozilla/5.0 (Streamlit-KeepAlive-24x7)"},
+                        )
+                        with urllib.request.urlopen(req, timeout=8) as r:
+                            _ = r.status
+                    except Exception:
+                        pass
+                # Ping no Supabase REST endpoint para evitar pausa por inatividade
+                sb_url = st.secrets.get("SUPABASE_URL", os.environ.get("SUPABASE_URL", ""))
+                sb_key = st.secrets.get("SUPABASE_KEY", os.environ.get("SUPABASE_KEY", ""))
+                if sb_url and sb_key:
+                    try:
+                        req_sb = urllib.request.Request(
+                            f"{sb_url}/rest/v1/",
+                            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+                        )
+                        with urllib.request.urlopen(req_sb, timeout=8) as r:
+                            _ = r.status
+                    except Exception:
+                        pass
+                estado["ultimo_ping"] = time.strftime("%d/%m/%Y %H:%M:%S")
+                estado["total_pings"] += 1
+            except Exception:
+                pass
+            time.sleep(240)  # A cada 4 minutos
+
+    t = threading.Thread(target=_loop, daemon=True)
+    t.start()
+    return estado
+
+
+_keepalive_info = _iniciar_keepalive_24x7()
+
+
 @st.cache_resource(show_spinner=False)
 def _controle_forca_bruta_global():
     """Estado global no servidor para bloquear força bruta mesmo abrindo abas anônimas."""
@@ -309,7 +375,7 @@ def _inicializar_supabase_storage(sync_token: str):
             DECLARE
                 v_res jsonb;
             BEGIN
-                IF p_app_key NOT IN ('deposito_alimentos', 'distribuidora_bebidas') THEN
+                IF p_app_key NOT IN ('deposito_alimentos', 'distribuidora_bebidas', 'barbearia_app') THEN
                     RAISE EXCEPTION 'App key invalida';
                 END IF;
 
