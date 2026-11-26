@@ -10,6 +10,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 from sqlalchemy import create_engine, text
 
+from licencas import CATALOGO_APPS, renderizar_painel_admin_licencas, validar_licenca
+
 try:
     import extra_streamlit_components as stx
 except ImportError:
@@ -36,9 +38,12 @@ def _obter_urls_apps_keepalive() -> list:
         "https://distribuidora-bebidas.streamlit.app",
         "https://deposito-alimentos.streamlit.app",
         "https://barbearia-app.streamlit.app",
+        "https://safe-training-monitor-stm.streamlit.app",
+        "https://safe-training-monitor.streamlit.app",
         "http://127.0.0.1:8501",
         "http://127.0.0.1:8502",
         "http://127.0.0.1:8503",
+        "http://127.0.0.1:8504",
     ]
     extras_raw = str(st.secrets.get("KEEPALIVE_URLS", os.environ.get("KEEPALIVE_URLS", ""))).strip()
     if extras_raw:
@@ -127,11 +132,11 @@ def _obter_pin_esperado() -> str:
     return _obter_pins_por_perfil()["ceo"]
 
 
-def _gerar_sync_token() -> str:
+def _gerar_sync_token(tenant_app_key: str = APP_KEY, pin_ref: str = "") -> str:
     db_url = st.secrets.get("DATABASE_URL", os.environ.get("DATABASE_URL", "local"))
-    pin = _obter_pin_esperado()
+    pin = pin_ref or _obter_pin_esperado()
     segredo = f"{db_url}::{pin}".encode("utf-8")
-    return hmac.new(segredo, APP_KEY.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.new(segredo, tenant_app_key.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 PERFIS_ROTULOS = {
@@ -151,10 +156,10 @@ def _chave_cookie() -> bytes:
     return f"cookie::{APP_KEY}::{db_url}::{pin}".encode("utf-8")
 
 
-def _criar_cookie_sessao(perfil: str, operador: str) -> str:
+def _criar_cookie_sessao(perfil: str, operador: str, chave_lic: str) -> str:
     payload = base64.urlsafe_b64encode(
         json.dumps(
-            {"r": perfil, "o": operador, "exp": int(time.time()) + COOKIE_DIAS * 86400},
+            {"r": perfil, "o": operador, "l": chave_lic, "exp": int(time.time()) + COOKIE_DIAS * 86400},
             separators=(",", ":"),
         ).encode("utf-8")
     ).decode("ascii")
@@ -162,7 +167,7 @@ def _criar_cookie_sessao(perfil: str, operador: str) -> str:
     return f"{payload}.{sig}"
 
 
-def _validar_cookie_sessao(token: str, pins: dict):
+def _validar_cookie_sessao(token: str):
     if not token or "." not in str(token):
         return None
     try:
@@ -174,16 +179,30 @@ def _validar_cookie_sessao(token: str, pins: dict):
         if int(dados.get("exp", 0)) < time.time():
             return None
         perfil = dados.get("r")
-        if perfil not in pins:
+        if perfil not in ("ceo", "gerente", "vendedor"):
             return None
-        return perfil, str(dados.get("o") or "")
+        chave_lic = str(dados.get("l") or CATALOGO_APPS[APP_KEY]["chave_mestre"]).strip().upper()
+        return perfil, str(dados.get("o") or ""), chave_lic
     except Exception:
         return None
 
 
+def _pins_da_licenca(res_lic: dict) -> dict:
+    lic = res_lic.get("licenca", {})
+    if lic.get("is_master") or lic.get("chave") == CATALOGO_APPS[APP_KEY]["chave_mestre"]:
+        return _obter_pins_por_perfil()
+    return {
+        "ceo": str(lic.get("pin_ceo") or "1234"),
+        "gerente": str(lic.get("pin_gerente") or "2222"),
+        "vendedor": str(lic.get("pin_operador") or "1111"),
+    }
+
+
 def _verificar_pin_acesso(titulo_app: str, icone: str):
-    """Bloqueia o acesso no servidor Streamlit e mantém a sessão em cookie assinado (HMAC) ao atualizar a página."""
-    pins = _obter_pins_por_perfil()
+    """Bloqueia o acesso no servidor Streamlit, valida a Chave de Licença SaaS e mantém a sessão em cookie HMAC."""
+    chave_padrao = CATALOGO_APPS[APP_KEY]["chave_mestre"]
+    raw_lic_param = st.query_params.get("lic", "")
+    lic_sugerida = str(raw_lic_param).strip().upper() if raw_lic_param else chave_padrao
 
     cookie_manager = stx.CookieManager(key="db_cookie_manager") if stx else None
     cookies = (cookie_manager.get_all() or {}) if cookie_manager else {}
@@ -196,23 +215,37 @@ def _verificar_pin_acesso(titulo_app: str, icone: str):
         else:
             st.session_state.pop("_logout_pendente", None)
 
-    # Já autenticado nesta sessão
-    elif st.session_state.get("pin_autenticado") and st.session_state.get("nivel_acesso") in pins:
-        pendente = st.session_state.pop("_salvar_cookie", None)
-        if pendente and cookie_manager:
-            expira = datetime.datetime.now() + datetime.timedelta(days=COOKIE_DIAS)
-            cookie_manager.set(COOKIE_NOME, pendente, expires_at=expira, key="set_db_cookie")
-        return st.session_state["nivel_acesso"], st.session_state.get("operador_nome", "")
+    # Já autenticado nesta sessão: revalida licença a cada execução (permite bloqueio imediato)
+    elif st.session_state.get("pin_autenticado") and st.session_state.get("nivel_acesso") in ("ceo", "gerente", "vendedor"):
+        chave_sess = st.session_state.get("licenca_chave", chave_padrao)
+        res_lic = validar_licenca(chave_sess, APP_KEY)
+        if not res_lic.get("valida"):
+            st.session_state.pop("pin_autenticado", None)
+            st.error(f"⛔ {res_lic.get('motivo', 'Licença inválida ou expirada.')}")
+        else:
+            pendente = st.session_state.pop("_salvar_cookie", None)
+            if pendente and cookie_manager:
+                expira = datetime.datetime.now() + datetime.timedelta(days=COOKIE_DIAS)
+                cookie_manager.set(COOKIE_NOME, pendente, expires_at=expira, key="set_db_cookie")
+            return (
+                st.session_state["nivel_acesso"],
+                st.session_state.get("operador_nome", ""),
+                res_lic,
+            )
 
     # Restaura sessão automaticamente após F5 / atualizar página
     elif cookie_token and not st.session_state.get("_cookie_invalido"):
-        restaurado = _validar_cookie_sessao(cookie_token, pins)
+        restaurado = _validar_cookie_sessao(cookie_token)
         if restaurado:
-            perfil_rest, op_rest = restaurado
-            st.session_state["pin_autenticado"] = True
-            st.session_state["nivel_acesso"] = perfil_rest
-            st.session_state["operador_nome"] = op_rest
-            return perfil_rest, op_rest
+            perfil_rest, op_rest, chave_rest = restaurado
+            res_lic = validar_licenca(chave_rest, APP_KEY)
+            if res_lic.get("valida"):
+                st.session_state["pin_autenticado"] = True
+                st.session_state["nivel_acesso"] = perfil_rest
+                st.session_state["operador_nome"] = op_rest
+                st.session_state["licenca_chave"] = chave_rest
+                return perfil_rest, op_rest, res_lic
+            st.error(f"⛔ {res_lic.get('motivo', 'Licença expirada ou bloqueada.')}")
         st.session_state["_cookie_invalido"] = True
         if cookie_manager:
             cookie_manager.delete(COOKIE_NOME, key="del_db_cookie_inv")
@@ -227,12 +260,17 @@ def _verificar_pin_acesso(titulo_app: str, icone: str):
         st.error(f"🔒 Muitas tentativas incorretas. Sistema bloqueado por {restante}s.")
         st.stop()
 
-    _, col_centro, _ = st.columns([1, 1.4, 1])
+    _, col_centro, _ = st.columns([1, 1.5, 1])
     with col_centro:
-        st.markdown("<div style='height: 10vh'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 6vh'></div>", unsafe_allow_html=True)
         with st.form("form_pin_acesso"):
             st.markdown(f"### {icone} {titulo_app}")
-            st.caption("Selecione o perfil, informe seu nome e o PIN")
+            st.caption("Informe a Chave de Licença da sua empresa, seu perfil e o PIN")
+            chave_lic_input = st.text_input(
+                "🔑 Chave de Licença:",
+                value=lic_sugerida,
+                placeholder="Ex: BEB-2026-XXXX",
+            )
             perfil = st.selectbox(
                 "Perfil:",
                 options=["ceo", "gerente", "vendedor"],
@@ -246,41 +284,56 @@ def _verificar_pin_acesso(titulo_app: str, icone: str):
             entrar = st.form_submit_button("Entrar no Sistema", type="primary", use_container_width=True)
 
             if entrar:
-                nome_limpo = (nome_operador or "").strip()
-                if perfil == "vendedor" and not nome_limpo:
-                    st.warning("Informe seu nome para identificar suas vendas.")
+                res_lic = validar_licenca(chave_lic_input, APP_KEY)
+                if not res_lic.get("valida"):
+                    st.error(f"⛔ {res_lic.get('motivo', 'Chave de licença inválida.')}")
                 else:
-                    pin_correto = pins.get(perfil, "")
-                    if pin_digitado and hmac.compare_digest(pin_digitado.strip(), pin_correto):
-                        with guard["lock"]:
-                            guard["falhas"] = 0
-                            guard["bloqueado_ate"] = 0.0
-                        if not nome_limpo:
-                            nome_limpo = "Dono / CEO" if perfil == "ceo" else "Gerente"
-                        st.session_state["pin_autenticado"] = True
-                        st.session_state["nivel_acesso"] = perfil
-                        st.session_state["operador_nome"] = nome_limpo
-                        st.session_state["_salvar_cookie"] = _criar_cookie_sessao(perfil, nome_limpo)
-                        st.session_state.pop("_cookie_invalido", None)
-                        st.session_state.pop("_logout_pendente", None)
-                        st.rerun()
+                    pins = _pins_da_licenca(res_lic)
+                    nome_limpo = (nome_operador or "").strip()
+                    if perfil == "vendedor" and not nome_limpo:
+                        st.warning("Informe seu nome para identificar suas vendas.")
                     else:
-                        with guard["lock"]:
-                            guard["falhas"] += 1
-                            tentativas = guard["falhas"]
-                            atraso = min(8.0, float(2 ** (tentativas - 1)))
-                            if tentativas >= 5:
-                                guard["bloqueado_ate"] = time.time() + 300.0
+                        pin_correto = pins.get(perfil, "")
+                        if pin_digitado and hmac.compare_digest(pin_digitado.strip(), pin_correto):
+                            with guard["lock"]:
                                 guard["falhas"] = 0
-                        time.sleep(atraso)
-                        if tentativas >= 5:
-                            st.error("🔒 Limite de 5 tentativas excedido. Acesso bloqueado globalmente por 5 minutos.")
+                                guard["bloqueado_ate"] = 0.0
+                            if not nome_limpo:
+                                nome_limpo = "Dono / CEO" if perfil == "ceo" else "Gerente"
+                            chave_ok = res_lic["licenca"]["chave"]
+                            st.session_state["pin_autenticado"] = True
+                            st.session_state["nivel_acesso"] = perfil
+                            st.session_state["operador_nome"] = nome_limpo
+                            st.session_state["licenca_chave"] = chave_ok
+                            st.session_state["_salvar_cookie"] = _criar_cookie_sessao(perfil, nome_limpo, chave_ok)
+                            st.session_state.pop("_cookie_invalido", None)
+                            st.session_state.pop("_logout_pendente", None)
+                            st.rerun()
                         else:
-                            st.error(f"PIN incorreto ({tentativas}/5 tentativas).")
+                            with guard["lock"]:
+                                guard["falhas"] += 1
+                                tentativas = guard["falhas"]
+                                atraso = min(8.0, float(2 ** (tentativas - 1)))
+                                if tentativas >= 5:
+                                    guard["bloqueado_ate"] = time.time() + 300.0
+                                    guard["falhas"] = 0
+                            time.sleep(atraso)
+                            if tentativas >= 5:
+                                st.error("🔒 Limite de 5 tentativas excedido. Acesso bloqueado globalmente por 5 minutos.")
+                            else:
+                                st.error(f"PIN incorreto ({tentativas}/5 tentativas).")
+
+        with st.expander("💼 Painel do Proprietário — Gerar & Gerenciar Licenças (SaaS)", expanded=False):
+            renderizar_painel_admin_licencas(APP_KEY, "db_login")
     st.stop()
 
 
-nivel_acesso_atual, operador_atual = _verificar_pin_acesso("Distribuidora de Bebidas — Estoque & PDV", "🍺")
+nivel_acesso_atual, operador_atual, licenca_info_atual = _verificar_pin_acesso("Distribuidora de Bebidas — Estoque & PDV", "🍺")
+TENANT_APP_KEY = licenca_info_atual["tenant_app_key"]
+LICENCA_OBJ = licenca_info_atual["licenca"]
+if TENANT_APP_KEY != APP_KEY:
+    _slug_lic = LICENCA_OBJ["chave"].replace(":", "_")
+    DATA_FILE = os.path.join(BASE_DIR, f"dados_distribuidora_{_slug_lic}.json")
 
 
 def _novo_banco_padrao():
@@ -316,7 +369,7 @@ def _ler_dados_locais():
 
 
 @st.cache_resource(show_spinner=False, ttl=3600)
-def _inicializar_supabase_storage(sync_token: str):
+def _inicializar_supabase_storage(sync_token: str, tenant_app_key: str = APP_KEY):
     """Cria tabelas blindadas com RLS e RPC autenticada por token HMAC no Supabase PostgreSQL."""
     db_url = st.secrets.get("DATABASE_URL", os.environ.get("DATABASE_URL", ""))
     if not db_url:
@@ -356,7 +409,7 @@ def _inicializar_supabase_storage(sync_token: str):
                 ON CONFLICT (app_key)
                 DO UPDATE SET sync_token = EXCLUDED.sync_token, updated_at = now()
             """),
-            {"k": APP_KEY, "t": sync_token},
+            {"k": tenant_app_key, "t": sync_token},
         )
 
         conn.execute(text("DROP FUNCTION IF EXISTS public.sync_app_storage(text, text, jsonb)"))
@@ -375,7 +428,11 @@ def _inicializar_supabase_storage(sync_token: str):
             DECLARE
                 v_res jsonb;
             BEGIN
-                IF p_app_key NOT IN ('deposito_alimentos', 'distribuidora_bebidas', 'barbearia_app') THEN
+                IF NOT (
+                    p_app_key LIKE 'deposito_alimentos%'
+                    OR p_app_key LIKE 'distribuidora_bebidas%'
+                    OR p_app_key LIKE 'barbearia_app%'
+                ) THEN
                     RAISE EXCEPTION 'App key invalida';
                 END IF;
 
@@ -412,7 +469,7 @@ def _inicializar_supabase_storage(sync_token: str):
 
         row = conn.execute(
             text("SELECT dados FROM public.app_cloud_storage WHERE app_key = :k"),
-            {"k": APP_KEY},
+            {"k": tenant_app_key},
         ).fetchone()
         if not row:
             conn.execute(
@@ -420,7 +477,7 @@ def _inicializar_supabase_storage(sync_token: str):
                     INSERT INTO public.app_cloud_storage (app_key, dados, updated_at)
                     VALUES (:k, CAST(:d AS jsonb), now())
                 """),
-                {"k": APP_KEY, "d": json.dumps(iniciais, ensure_ascii=False)},
+                {"k": tenant_app_key, "d": json.dumps(iniciais, ensure_ascii=False)},
             )
             return iniciais
         return row[0] if isinstance(row[0], dict) else json.loads(row[0])
@@ -483,13 +540,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Barra superior discreta com perfil logado e botão de Sair / Trocar Perfil
+# Barra superior discreta com perfil logado, licença e botão de Sair / Trocar Perfil
 col_perfil, col_sair = st.columns([4, 1.4])
 with col_perfil:
+    _dias_l = licenca_info_atual.get("dias_restantes", 0)
+    _lic_badge = "👑 Mestre" if LICENCA_OBJ.get("is_master") else f"🔑 {LICENCA_OBJ.get('chave')} ({_dias_l}d)"
     st.markdown(
         f"<div style='font-size:12px;font-weight:700;color:#fafaf9;padding:4px 0;'>"
         f"🔐 <span style='color:#fbbf24'>{PERFIS_ROTULOS.get(nivel_acesso_atual, nivel_acesso_atual)}</span>"
         f" &nbsp;·&nbsp; 👤 <span style='color:#e7e5e4'>{operador_atual}</span>"
+        f" &nbsp;·&nbsp; <span style='color:#a5b4fc'>{_lic_badge}</span>"
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -498,12 +558,13 @@ with col_sair:
         st.session_state.pop("pin_autenticado", None)
         st.session_state.pop("nivel_acesso", None)
         st.session_state.pop("operador_nome", None)
+        st.session_state.pop("licenca_chave", None)
         st.session_state["_logout_pendente"] = True
         st.rerun()
 
-token_sincronizacao = _gerar_sync_token()
+token_sincronizacao = _gerar_sync_token(TENANT_APP_KEY)
 try:
-    dados_iniciais = _inicializar_supabase_storage(token_sincronizacao)
+    dados_iniciais = _inicializar_supabase_storage(token_sincronizacao, TENANT_APP_KEY)
 except Exception:
     dados_iniciais = _ler_dados_locais()
 
@@ -529,7 +590,7 @@ bridge_script = f"""
 (function() {{
   const SUPABASE_URL = {json.dumps(supabase_url)};
   const SUPABASE_KEY = {json.dumps(supabase_key)};
-  const APP_KEY = {json.dumps(APP_KEY)};
+  const APP_KEY = {json.dumps(TENANT_APP_KEY)};
   const SYNC_TOKEN = {json.dumps(token_sincronizacao)};
   const CURRENT_ROLE = {json.dumps(nivel_acesso_atual)};
   const CURRENT_OPERATOR = {json.dumps(operador_atual)};
