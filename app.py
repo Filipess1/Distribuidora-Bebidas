@@ -40,6 +40,7 @@ def _obter_urls_apps_keepalive() -> list:
         "https://barbearia-app.streamlit.app",
         "https://safe-training-monitor-stm.streamlit.app",
         "https://safe-training-monitor.streamlit.app",
+        "https://d8u3lfq2zd9xksxkpy4rul.streamlit.app",
         "http://127.0.0.1:8501",
         "http://127.0.0.1:8502",
         "http://127.0.0.1:8503",

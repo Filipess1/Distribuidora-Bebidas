@@ -2,19 +2,62 @@ name: Keep Streamlit Apps Awake 24/7
 
 on:
   schedule:
-    - cron: '*/25 * * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
   keepalive:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Streamlit Apps & Prevent Hibernation
+      - name: Instalar Playwright (Chromium)
         run: |
-          for url in \
-            "https://distribuidora-bebidas.streamlit.app" \
-            "https://deposito-alimentos.streamlit.app" \
-            "https://barbearia-app.streamlit.app"; do
-            echo "Pinging $url ..."
-            curl -s -L -A "Mozilla/5.0 (Streamlit-KeepAlive-24x7)" --max-time 25 "$url" > /dev/null || true
-          done
+          python3 -m pip install --quiet playwright
+          python3 -m playwright install chromium
+
+      - name: Abrir Apps no Navegador Real e Acordar se Hibernados
+        env:
+          EXTRA_URLS: ${{ vars.STREAMLIT_URLS }}
+        run: |
+          python3 - <<'PY'
+          import os, time
+          from playwright.sync_api import sync_playwright
+
+          urls = [
+              "https://distribuidora-bebidas.streamlit.app",
+              "https://deposito-alimentos.streamlit.app",
+              "https://barbearia-app.streamlit.app",
+              "https://d8u3lfq2zd9xksxkpy4rul.streamlit.app",
+          ]
+          extra = os.environ.get("EXTRA_URLS", "").strip()
+          if extra:
+              for u in extra.split(","):
+                  u = u.strip()
+                  if u and u not in urls:
+                      urls.append(u)
+
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              context = browser.new_context(viewport={"width": 1280, "height": 800})
+              for url in urls:
+                  page = context.new_page()
+                  try:
+                      print(f"Abrindo {url} ...")
+                      page.goto(url, wait_until="domcontentloaded", timeout=45000)
+                      page.wait_for_timeout(5000)
+                      # Se o Streamlit Cloud estiver hibernando, clica no botão de acordar
+                      for texto_btn in ["Yes, get this app back up!", "get this app back up", "Wake up"]:
+                          btn = page.get_by_role("button", name=texto_btn)
+                          if btn.count() > 0:
+                              print(f"  -> App hibernando! Clicando para acordar: {url}")
+                              btn.first.click()
+                              page.wait_for_timeout(20000)
+                              break
+                      # Mantém o WebSocket ativo por alguns segundos para zerar o timer de ociosidade
+                      page.wait_for_timeout(8000)
+                      print(f"  -> OK ({page.title()})")
+                  except Exception as e:
+                      print(f"  -> Aviso em {url}: {e}")
+                  finally:
+                      page.close()
+              browser.close()
+          PY
