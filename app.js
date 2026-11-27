@@ -31,6 +31,7 @@
     { id: 'saida', nome: 'Balcão (PDV)', ico: '🛒' },
     { id: 'mesas', nome: 'Mesas (Consumo Local)', ico: '🪑' },
     { id: 'reposicao', nome: 'Reposição', ico: '📋' },
+    { id: 'relatorio', nome: 'Relatório de Vendas', ico: '📈' },
     { id: 'estoque', nome: 'Estoque & Lotes', ico: '📦' },
     { id: 'entrada', nome: 'Entrada de Compras', ico: '📥' },
     { id: 'clientes', nome: 'Clientes & Fiado', ico: '👥' },
@@ -45,7 +46,7 @@
   var PIN = localStorage.getItem('db_pin') || '';
   var tab = localStorage.getItem('db_tab') || 'dashboard';
   var online = true;
-  var F = { estBusca: '', estCat: '', estDep: '', estSt: '', repFiltro: 'todos', cliBusca: '', hisAba: 'vendas', hisBusca: '', hisTipo: '', hisCliente: '', depSel: '' };
+  var F = { estBusca: '', estCat: '', estDep: '', estSt: '', repFiltro: 'todos', relPeriodo: '30d', relCat: '', cliBusca: '', hisAba: 'vendas', hisBusca: '', hisTipo: '', hisCliente: '', depSel: '' };
   var expandido = {};
   var cart = [];
 
@@ -447,7 +448,7 @@
       '<div class="flex flex-wrap gap-2"><button class="btn btn-pri" onclick="A.tab(\'saida\')">🛒 Venda Rápida (PDV)</button><button class="btn btn-green" onclick="A.tab(\'mesas\')">🪑 Mesas / Consumo Local</button><button id="btn-hdr-precos" class="btn btn-out" onclick="A.tabelaPrecosModal()">💲 Editar Preços</button><button class="btn btn-dark" onclick="A.scanGlobal()">📷 Escanear</button><button class="btn btn-out" onclick="A.celular()">📱 Celular</button><button id="btn-hdr-config" class="btn btn-out" onclick="A.config()">⚙️ Ajustes</button></div></header>' +
       '<nav id="nav" class="flex gap-1.5 overflow-x-auto pb-1 border-b border-stone-300 text-sm font-semibold"></nav>' +
       TABS.map(function (t) { return '<section id="tab-' + t.id + '" class="hidden"><div id="v-' + t.id + '" class="space-y-5"></div></section>'; }).join('');
-    mountEstoque(); mountReposicao(); mountEntrada(); mountSaida(); mountMesas(); mountClientes(); mountDepositos(); mountHistorico();
+    mountEstoque(); mountReposicao(); mountRelatorio(); mountEntrada(); mountSaida(); mountMesas(); mountClientes(); mountDepositos(); mountHistorico();
   }
   function renderStatus() {
     var el = $('h-status'); if (!el) return;
@@ -2002,6 +2003,292 @@
       hisMov().forEach(function (h) { m.push([fmtData(h.data), h.tipo, h.produto, h.lote, h.qtd, h.motivo, String(h.valor || 0).replace('.', ','), h.responsavel]); });
       csv('movimentacoes-' + diaLocal() + '.csv', m);
     }
+  };
+
+  // ============================================================ RELATÓRIO DE VENDAS & OTIMIZAÇÃO DE ESTOQUE
+  function mountRelatorio() {
+    $('v-relatorio').innerHTML =
+      '<div class="card p-4 flex flex-wrap gap-3 items-center justify-between">' +
+      '<div class="flex flex-wrap gap-2 items-center">' +
+      '<span class="text-xs font-extrabold uppercase text-stone-500 mr-1">Período:</span>' +
+      [['hoje', 'Hoje'], ['7d', 'Últimos 7 dias'], ['30d', 'Últimos 30 dias'], ['tudo', 'Todo o período']].map(function (o) {
+        return '<button type="button" class="btn btn-sm btn-out" data-relp="' + o[0] + '">' + o[1] + '</button>';
+      }).join('') +
+      '<select id="rel-cat" class="inp !w-auto !py-1.5 text-xs"><option value="">Todas as categorias</option></select>' +
+      '</div>' +
+      '<button type="button" class="btn btn-out btn-sm" onclick="A.relCsv()">⬇️ Exportar Relatório CSV</button>' +
+      '</div>' +
+      '<div id="rel-body" class="space-y-5"></div>';
+
+    $('v-relatorio').querySelectorAll('[data-relp]').forEach(function (b) {
+      b.onclick = function () { F.relPeriodo = b.dataset.relp; RENDER.relatorio(); };
+    });
+    $('rel-cat').onchange = function () { F.relCat = this.value; RENDER.relatorio(); };
+  }
+
+  function calcularDadosRelatorio() {
+    var agora = Date.now();
+    var hoje = diaLocal();
+    var diasJanela = F.relPeriodo === 'hoje' ? 1 : (F.relPeriodo === '7d' ? 7 : (F.relPeriodo === '30d' ? 30 : 36500));
+    var limiteMs = F.relPeriodo === 'hoje' ? 0 : (agora - diasJanela * 864e5);
+
+    var vendasFiltradas = (S.vendas || []).filter(function (v) {
+      if (v.tipo !== 'Venda' || v.status === 'Estornada') return false;
+      if (F.relPeriodo === 'hoje') return diaLocal(new Date(v.data)) === hoje;
+      if (F.relPeriodo === 'tudo') return true;
+      return new Date(v.data).getTime() >= limiteMs;
+    });
+
+    var porProd = {};
+    S.produtos.forEach(function (p) {
+      if (F.relCat && p.categoria !== F.relCat) return;
+      var est = E[p.id] || { total: 0 };
+      porProd[p.id] = {
+        p: p,
+        qtd: 0,
+        faturamento: 0,
+        custo: 0,
+        pedidos: 0,
+        estoqueAtual: est.total || 0
+      };
+    });
+
+    var porHora = [];
+    for (var h = 0; h < 24; h++) {
+      porHora.push({ hora: h, label: pad2(h) + ':00', vendas: 0, itens: 0, faturamento: 0 });
+    }
+    var turnos = {
+      manha: { nome: 'Manhã (06h–11h)', ico: '☀️', vendas: 0, itens: 0, faturamento: 0 },
+      tarde: { nome: 'Tarde (12h–17h)', ico: '🌇', vendas: 0, itens: 0, faturamento: 0 },
+      noite: { nome: 'Noite (18h–23h)', ico: '🌙', vendas: 0, itens: 0, faturamento: 0 },
+      madrugada: { nome: 'Madrugada (00h–05h)', ico: '🦉', vendas: 0, itens: 0, faturamento: 0 }
+    };
+
+    var totalFaturamento = 0;
+    var totalItens = 0;
+    var totalVendas = 0;
+
+    vendasFiltradas.forEach(function (v) {
+      var dt = new Date(v.data);
+      var hr = isNaN(dt.getTime()) ? 12 : dt.getHours();
+      var itensVenda = 0;
+      var fatVenda = 0;
+
+      (v.itens || []).forEach(function (it) {
+        var prod = P(it.produtoId);
+        if (F.relCat && (!prod || prod.categoria !== F.relCat)) return;
+        var q = Number(it.qtd) || 0;
+        var sub = Number(it.subtotal) || 0;
+        var cst = Number(it.custo) || 0;
+        itensVenda += q;
+        fatVenda += sub;
+        if (!porProd[it.produtoId] && prod) {
+          var est = E[prod.id] || { total: 0 };
+          porProd[it.produtoId] = { p: prod, qtd: 0, faturamento: 0, custo: 0, pedidos: 0, estoqueAtual: est.total || 0 };
+        }
+        if (porProd[it.produtoId]) {
+          porProd[it.produtoId].qtd += q;
+          porProd[it.produtoId].faturamento += sub;
+          porProd[it.produtoId].custo += cst;
+          porProd[it.produtoId].pedidos += 1;
+        }
+      });
+
+      if (itensVenda > 0) {
+        totalVendas += 1;
+        totalItens += itensVenda;
+        totalFaturamento += fatVenda;
+        porHora[hr].vendas += 1;
+        porHora[hr].itens += itensVenda;
+        porHora[hr].faturamento += fatVenda;
+
+        var tk = (hr >= 6 && hr <= 11) ? 'manha' : (hr >= 12 && hr <= 17 ? 'tarde' : (hr >= 18 ? 'noite' : 'madrugada'));
+        turnos[tk].vendas += 1;
+        turnos[tk].itens += itensVenda;
+        turnos[tk].faturamento += fatVenda;
+      }
+    });
+
+    var lista = Object.keys(porProd).map(function (id) {
+      var x = porProd[id];
+      var mediaDia = x.qtd / Math.max(1, diasJanela === 36500 ? 30 : diasJanela);
+      var diasCobertura = mediaDia > 0 ? Math.round((x.estoqueAtual / mediaDia) * 10) / 10 : Infinity;
+      var minEst = x.p.minimo || 5;
+      var rec = { label: 'Normal', cls: 'bg-stone-100 text-stone-700 border-stone-200', ordem: 2 };
+      if (x.qtd > 0 && (x.estoqueAtual <= minEst || diasCobertura <= 7)) {
+        rec = { label: '🚨 Comprar Urgente (Alta Saída)', cls: 'bg-rose-100 text-rose-800 border-rose-300', ordem: 0 };
+      } else if (x.qtd > 0) {
+        rec = { label: '🔥 Priorizar na Compra', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300', ordem: 1 };
+      } else if (x.estoqueAtual > minEst * 2) {
+        rec = { label: '❄️ Parado (Evitar Comprar)', cls: 'bg-sky-100 text-sky-800 border-sky-300', ordem: 3 };
+      } else {
+        rec = { label: '🧊 Sem Saída no Período', cls: 'bg-stone-100 text-stone-600 border-stone-300', ordem: 4 };
+      }
+      x.diasCobertura = diasCobertura;
+      x.rec = rec;
+      return x;
+    });
+
+    var maisVendidos = lista.filter(function (x) { return x.qtd > 0; }).sort(function (a, b) {
+      return b.qtd - a.qtd || b.faturamento - a.faturamento;
+    });
+    var menosVendidos = lista.slice().sort(function (a, b) {
+      return a.qtd - b.qtd || b.estoqueAtual - a.estoqueAtual;
+    });
+    var horasOrdenadas = porHora.slice().sort(function (a, b) { return b.vendas - a.vendas || b.faturamento - a.faturamento; });
+    var horaPico = horasOrdenadas[0] && horasOrdenadas[0].vendas > 0 ? horasOrdenadas[0] : null;
+
+    return {
+      totalVendas: totalVendas,
+      totalItens: totalItens,
+      totalFaturamento: totalFaturamento,
+      maisVendidos: maisVendidos,
+      menosVendidos: menosVendidos,
+      porHora: porHora,
+      horaPico: horaPico,
+      turnos: turnos
+    };
+  }
+
+  RENDER.relatorio = function () {
+    var selCat = $('rel-cat');
+    if (selCat) {
+      var cur = F.relCat;
+      selCat.innerHTML = '<option value="">Todas as categorias</option>' +
+        (S.categorias || []).map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('');
+      selCat.value = cur;
+    }
+    $('v-relatorio').querySelectorAll('[data-relp]').forEach(function (b) {
+      var ativo = b.dataset.relp === F.relPeriodo;
+      b.className = 'btn btn-sm ' + (ativo ? 'btn-pri' : 'btn-out');
+    });
+
+    var d = calcularDadosRelatorio();
+    var root = $('rel-body');
+    var top1 = d.maisVendidos[0];
+    var maxQtdTop = top1 ? top1.qtd : 1;
+    var maxVendasHora = Math.max.apply(null, d.porHora.map(function (h) { return h.vendas; }).concat([1]));
+
+    var turnoPico = Object.keys(d.turnos).map(function (k) { return d.turnos[k]; }).sort(function (a, b) { return b.vendas - a.vendas; })[0];
+
+    var kpisHtml = '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">' +
+      kpi('Vendas no Período', nf(d.totalVendas) + ' pedidos', nf(d.totalItens) + ' unidades vendidas', '🧾', 'bg-amber-100 text-amber-800') +
+      kpi(ehVendedor() ? 'Itens Vendidos' : 'Faturamento Analisado', ehVendedor() ? nf(d.totalItens) + ' un' : brl(d.totalFaturamento), d.totalVendas ? ('Ticket médio: ' + (ehVendedor() ? (Math.round((d.totalItens / d.totalVendas) * 10) / 10 + ' un/venda') : brl(d.totalFaturamento / d.totalVendas))) : 'Sem vendas no filtro', '💰', 'bg-emerald-100 text-emerald-800') +
+      kpi('Horário de Maior Fluxo', d.horaPico ? (d.horaPico.label + ' – ' + pad2((d.horaPico.hora + 1) % 24) + ':00') : 'Sem movimento', d.horaPico ? (d.horaPico.vendas + ' vendas (' + Math.round((d.horaPico.vendas / Math.max(1, d.totalVendas)) * 100) + '% do fluxo)') : 'Registre vendas no PDV', '⏰', 'bg-indigo-100 text-indigo-800') +
+      kpi('Produto Campeão', top1 ? esc(top1.p.nome) : 'Nenhum', top1 ? (nf(top1.qtd) + ' un vendidas · Estoque: ' + fmtQtd(top1.estoqueAtual, top1.p.unPorCx)) : 'Sem vendas no período', '🏆', 'bg-rose-100 text-rose-800') +
+      '</div>';
+
+    // Horários de maior fluxo
+    var horasAtivas = d.porHora.filter(function (h) { return h.vendas > 0 || (h.hora >= 8 && h.hora <= 23); });
+    var topHorasSet = {};
+    d.porHora.slice().sort(function (a, b) { return b.vendas - a.vendas; }).slice(0, 3).forEach(function (h) {
+      if (h.vendas > 0) topHorasSet[h.hora] = true;
+    });
+
+    var fluxoHtml = '<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">' +
+      '<div class="card p-5 lg:col-span-2">' +
+      '<div class="flex flex-wrap items-center justify-between gap-2 mb-3">' +
+      '<div><h3 class="font-extrabold text-stone-900">⏰ Fluxo de Vendas por Horário</h3>' +
+      '<p class="text-xs text-stone-500">Identifique os horários de pico para reforçar geladeiras e atendimento antes do movimento subir</p></div>' +
+      (d.horaPico ? '<span class="badge bg-amber-100 text-amber-900 border-amber-300">🔥 Pico: ' + d.horaPico.label + '</span>' : '') +
+      '</div>' +
+      '<div class="space-y-1.5">' +
+      horasAtivas.map(function (h) {
+        var pct = (h.vendas / maxVendasHora) * 100;
+        var isPico = !!topHorasSet[h.hora];
+        return '<div class="grid grid-cols-12 items-center gap-2 text-xs">' +
+          '<div class="col-span-2 font-mono font-bold ' + (isPico ? 'text-amber-700' : 'text-stone-600') + '">' + h.label + (isPico ? ' 🔥' : '') + '</div>' +
+          '<div class="col-span-6">' + barra(pct, isPico ? 'bg-amber-500' : (h.vendas > 0 ? 'bg-stone-500' : 'bg-stone-200')) + '</div>' +
+          '<div class="col-span-4 text-right font-semibold ' + (h.vendas > 0 ? 'text-stone-800' : 'text-stone-400') + '">' +
+          h.vendas + ' vendas · ' + nf(h.itens) + ' un' + (ehVendedor() ? '' : (' · ' + brl(h.faturamento))) +
+          '</div></div>';
+      }).join('') +
+      '</div></div>' +
+      '<div class="card p-5 space-y-3">' +
+      '<h3 class="font-extrabold text-stone-900">🌓 Movimento por Turno</h3>' +
+      '<p class="text-xs text-stone-500">Distribuição do faturamento e pedidos ao longo do dia</p>' +
+      ['manha', 'tarde', 'noite', 'madrugada'].map(function (k) {
+        var t = d.turnos[k];
+        var pct = d.totalVendas ? Math.round((t.vendas / d.totalVendas) * 100) : 0;
+        var ehPicoT = turnoPico && turnoPico.vendas > 0 && turnoPico.nome === t.nome;
+        return '<div class="p-3 rounded-xl border ' + (ehPicoT ? 'bg-amber-50 border-amber-300' : 'bg-stone-50 border-stone-200') + '">' +
+          '<div class="flex justify-between text-xs font-extrabold text-stone-800"><span>' + t.ico + ' ' + t.nome + '</span><span>' + pct + '%</span></div>' +
+          '<div class="my-1.5">' + barra(pct, ehPicoT ? 'bg-amber-500' : 'bg-stone-500') + '</div>' +
+          '<div class="flex justify-between text-[11px] text-stone-500"><span>' + t.vendas + ' pedidos · ' + nf(t.itens) + ' un</span><span>' + (ehVendedor() ? '' : brl(t.faturamento)) + '</span></div>' +
+          '</div>';
+      }).join('') +
+      '</div></div>';
+
+    // Top Mais Vendidos vs Menos Vendidos
+    var topHtml = '<div class="card p-5">' +
+      '<div class="flex flex-wrap items-center justify-between gap-2 mb-3">' +
+      '<div><h3 class="font-extrabold text-stone-900">🏆 Produtos Mais Vendidos & Prioridade de Reposição</h3>' +
+      '<p class="text-xs text-stone-500">Estes são os itens que mais giram — compre em maior quantidade para nunca faltar no pico</p></div>' +
+      '<span class="badge bg-emerald-100 text-emerald-800 border-emerald-300">' + d.maisVendidos.length + ' produtos com saída</span>' +
+      '</div>' +
+      (!d.maisVendidos.length
+        ? '<div class="text-sm text-stone-500 py-6 text-center">Nenhuma venda registrada neste período.</div>'
+        : '<div class="overflow-x-auto"><table class="w-full text-xs text-left">' +
+          '<thead class="text-[11px] uppercase text-stone-500 border-b border-stone-200"><tr>' +
+          '<th class="py-2 pr-2">#</th><th class="py-2 pr-2">Produto</th><th class="py-2 pr-2">Saída (Qtd)</th>' +
+          (ehVendedor() ? '' : '<th class="py-2 pr-2">Faturamento</th>') +
+          '<th class="py-2 pr-2">Estoque Atual</th><th class="py-2 pr-2">Sugestão de Compra</th><th class="py-2 text-right">Ação</th>' +
+          '</tr></thead><tbody class="divide-y divide-stone-100">' +
+          d.maisVendidos.slice(0, 20).map(function (x, i) {
+            var pct = (x.qtd / maxQtdTop) * 100;
+            return '<tr class="hover:bg-stone-50">' +
+              '<td class="py-2.5 pr-2 font-extrabold text-stone-500">' + (i + 1) + 'º</td>' +
+              '<td class="py-2.5 pr-2"><div class="font-bold text-stone-900">' + (CAT_ICON[x.p.categoria] || '') + ' ' + esc(x.p.nome) + '</div>' +
+              '<div class="text-[11px] text-stone-500">' + esc(x.p.marca || x.p.categoria) + '</div></td>' +
+              '<td class="py-2.5 pr-2 w-40"><div class="font-extrabold text-stone-900">' + nf(x.qtd) + ' un <span class="text-[10px] font-normal text-stone-500">(' + fmtQtd(x.qtd, x.p.unPorCx) + ')</span></div>' + barra(pct, i < 3 ? 'bg-amber-500' : 'bg-emerald-500') + '</td>' +
+              (ehVendedor() ? '' : '<td class="py-2.5 pr-2 font-bold text-emerald-700">' + brl(x.faturamento) + '</td>') +
+              '<td class="py-2.5 pr-2 font-semibold">' + fmtQtd(x.estoqueAtual, x.p.unPorCx) + (isFinite(x.diasCobertura) ? ('<div class="text-[10px] text-stone-400">~' + x.diasCobertura + ' dias de estoque</div>') : '') + '</td>' +
+              '<td class="py-2.5 pr-2">' + badge(x.rec.label, x.rec.cls) + '</td>' +
+              '<td class="py-2.5 text-right"><button type="button" class="btn btn-green btn-sm" onclick="A.entradaPara(\'' + x.p.id + '\')">+ Comprar</button></td>' +
+              '</tr>';
+          }).join('') +
+          '</tbody></table></div>') +
+      '</div>';
+
+    var menosHtml = '<div class="card p-5">' +
+      '<div class="flex flex-wrap items-center justify-between gap-2 mb-3">' +
+      '<div><h3 class="font-extrabold text-stone-900">❄️ Produtos Menos Vendidos / Baixo Giro</h3>' +
+      '<p class="text-xs text-stone-500">Evite imobilizar dinheiro comprando estes itens em excesso; avalie promoções se estiverem parados</p></div>' +
+      '<span class="badge bg-sky-100 text-sky-800 border-sky-300">Top 20 menor giro</span>' +
+      '</div>' +
+      '<div class="overflow-x-auto"><table class="w-full text-xs text-left">' +
+      '<thead class="text-[11px] uppercase text-stone-500 border-b border-stone-200"><tr>' +
+      '<th class="py-2 pr-2">Produto</th><th class="py-2 pr-2">Vendidos no Período</th><th class="py-2 pr-2">Estoque Parado</th><th class="py-2">Orientação</th>' +
+      '</tr></thead><tbody class="divide-y divide-stone-100">' +
+      d.menosVendidos.slice(0, 20).map(function (x) {
+        return '<tr class="hover:bg-stone-50">' +
+          '<td class="py-2 pr-2"><div class="font-bold text-stone-900">' + (CAT_ICON[x.p.categoria] || '') + ' ' + esc(x.p.nome) + '</div>' +
+          '<div class="text-[11px] text-stone-500">' + esc(x.p.marca || x.p.categoria) + '</div></td>' +
+          '<td class="py-2 pr-2 font-bold ' + (x.qtd === 0 ? 'text-rose-600' : 'text-stone-700') + '">' + nf(x.qtd) + ' un</td>' +
+          '<td class="py-2 pr-2">' + fmtQtd(x.estoqueAtual, x.p.unPorCx) + '</td>' +
+          '<td class="py-2">' + badge(x.rec.label, x.rec.cls) + '</td>' +
+          '</tr>';
+      }).join('') +
+      '</tbody></table></div></div>';
+
+    root.innerHTML = kpisHtml + fluxoHtml + topHtml + menosHtml;
+  };
+
+  A.relCsv = function () {
+    var d = calcularDadosRelatorio();
+    var linhas = [['Ranking', 'Produto', 'Categoria', 'Qtd Vendida (un)', 'Estoque Atual (un)', 'Faturamento', 'Orientação de Compra']];
+    d.maisVendidos.concat(d.menosVendidos.filter(function (x) { return x.qtd === 0; })).forEach(function (x, i) {
+      linhas.push([
+        i + 1,
+        x.p.nome,
+        x.p.categoria,
+        x.qtd,
+        x.estoqueAtual,
+        ehVendedor() ? '-' : String(Math.round(x.faturamento * 100) / 100).replace('.', ','),
+        x.rec.label
+      ]);
+    });
+    csv('relatorio-vendas-' + diaLocal() + '.csv', linhas);
   };
 
   // ============================================================ ajustes, celular, scanner global
